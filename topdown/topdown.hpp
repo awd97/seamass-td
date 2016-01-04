@@ -26,6 +26,7 @@
 
 #include "seamass_topdown_export.h"
 #include <vector>
+#include <string>
 
 
 namespace seamass
