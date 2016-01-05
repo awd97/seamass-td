@@ -1,11 +1,11 @@
 seaMass-TD
 =======
 
-seaMass sparse signal decomposition and restoration of raw Top Down spectra
+seaMass decharging and deisotoping of Top Down spectra
 
 dependencies
 -------
-Depends on _CMake_, _HDF5_, _Boost_ and _libspatialindex_. **Note: _libspatialindex_ MUST be at least version 1.8.5**.
+Depends on _CMake_, _HDF5_ and _Boost_.
 Windows developers can get these from the [dependency repository](https://github.com/biospi/seamass-windeps).
 Also currently requires _Intel MKL_ with the _Intel C++ Compiler 14.0 or greater_.
 

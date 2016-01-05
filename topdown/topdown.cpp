@@ -27,6 +27,8 @@
 #include <sstream>
 #include <limits>
 #include <iomanip>
+#include <cmath>
+#include <cfloat>
 #include <omp.h>
 using namespace std;
 
