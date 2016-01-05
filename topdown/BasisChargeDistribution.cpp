@@ -27,18 +27,21 @@
 using namespace std;
 
 
+double proton_mass = 1.007276466879; // in Daltons
+double isotope_interval = 1.00286084990559; // average difference between monoisotope and second isotope peaks
+
+
 BasisUniformChargeDistribution::
 BasisUniformChargeDistribution(vector<Basis*>& bases,
                         const vector< vector<double> >& mzs,
                         const vector<fp>& gs, const vector<li>& _is, const vector<ii>& js,
-                        ii mass_res, ii max_z, double peak_width,
+                        ii mass_res, ii max_z, double peak_fwhm,
                         bool transient) :
     Basis(bases, 2, 0, transient),
     is(_is),
-	rc(pow(2.0, (double) mass_res))
+	rc(isotope_interval / pow(2.0, (double) mass_res))
 {
 	BSpline bspline(3, 65535);
-	double proton_mass = 1.007276466879; // in Daltons
 
     ///////////////////////////////////////////////////////////////////////
     // create A as a temporary COO matrix
@@ -64,8 +67,8 @@ BasisUniformChargeDistribution(vector<Basis*>& bases,
         mz0 = mzs[js[j]].front() < mz0 ? mzs[js[j]].front() : mz0;
         mz1 = mzs[js[j]].back() > mz1 ? mzs[js[j]].back() : mz1;
     }
-	mz0 -= 0.5*peak_width;
-	mz1 += 0.5*peak_width;
+	mz0 -= 0.5*peak_fwhm;
+	mz1 += 0.5*peak_fwhm;
 
 	// calculate output mass range
 	double mass0 = mz0 - proton_mass;
@@ -81,8 +84,8 @@ BasisUniformChargeDistribution(vector<Basis*>& bases,
 	if (gs[is[j] + i] >= 0.0)
 	for (ii z = 1; z <= max_z; z++)
 	{
-		double cf0 = z * (mzs[js[j]][i] - 0.5*peak_width - proton_mass) * rc;
-		double cf1 = z * (mzs[js[j]][i + 1] + 0.5*peak_width - proton_mass) * rc;
+		double cf0 = z * (mzs[js[j]][i] - 0.5*peak_fwhm - proton_mass) * rc;
+		double cf1 = z * (mzs[js[j]][i + 1] + 0.5*peak_fwhm - proton_mass) * rc;
 
 		ii ci0 = (ii) ceil(cf0);
 		ii ci1 = (ii) floor(cf1);
@@ -90,9 +93,7 @@ BasisUniformChargeDistribution(vector<Basis*>& bases,
 		nnz[j] += ci1 - ci0 + 1;
 	}
 
-	//ofstream ofs("A.csv");
 	// populate coo matrix
-    // should also implement b-splines as a lookup table, possibly faster
     ii done = 0;
     #pragma omp parallel for
     for(ii j = 0; j < cm.n[1]; ++j)
@@ -107,8 +108,8 @@ BasisUniformChargeDistribution(vector<Basis*>& bases,
 			if (gs[is[j] + i] >= 0.0)
 			for (ii z = 1; z <= max_z; z++)
 			{
-				double cf0 = z * (mzs[js[j]][i] - 0.5*peak_width - proton_mass) * rc;
-				double cf1 = z * (mzs[js[j]][i + 1] + 0.5*peak_width - proton_mass) * rc;
+				double cf0 = z * (mzs[js[j]][i] - 0.5*peak_fwhm - proton_mass) * rc;
+				double cf1 = z * (mzs[js[j]][i + 1] + 0.5*peak_fwhm - proton_mass) * rc;
 
 				ii ci0 = (ii)ceil(cf0);
 				ii ci1 = (ii)floor(cf1);
@@ -119,8 +120,8 @@ BasisUniformChargeDistribution(vector<Basis*>& bases,
 					double bin0 = z * (mzs[js[j]][i] - proton_mass) * rc;
 					double bin1 = z * (mzs[js[j]][i + 1] - proton_mass) * rc;
 
-					double basis0 = ci - z*rc*0.5*peak_width;
-					double basis1 = ci + z*rc*0.5*peak_width;
+					double basis0 = ci - z*rc*0.5*peak_fwhm;
+					double basis1 = ci + z*rc*0.5*peak_fwhm;
 
 					// intersection of bin and basis
 					double b0 = bin0 > basis0 ? (bin0 - basis0) / (basis1 - basis0) : 0.0;
@@ -133,8 +134,6 @@ BasisUniformChargeDistribution(vector<Basis*>& bases,
 					acoo[k] = b;
 					rowind[k] = i;
 					colind[k] = ci - cm.o[0];
-
-					//ofs << setprecision(10) << b << "," << 0.5*(mzs[js[j]][i] + mzs[js[j]][i + 1]) << "," << get_mass(ci - cm.o[0]) << endl;
 
 					k++;
 				}
@@ -244,15 +243,14 @@ BasisFreeformChargeDistribution::
 BasisFreeformChargeDistribution(vector<Basis*>& bases,
                                 const vector< vector<double> >& mzs,
 								const vector<fp>& gs, const vector<li>& _is, const vector<ii>& js,
-								ii mass_res, ii _max_z, double peak_width,
+								ii out_res, ii _max_z, double peak_fwhm,
 								bool transient) :
 	Basis(bases, 2, 0, transient),
 	is(_is),
-	rc(pow(2.0, (double)mass_res)),
+	out_interval(isotope_interval / pow(2.0, (double)out_res)),
 	max_z(_max_z)
 {
 	BSpline bspline(3, 65535);
-	double proton_mass = 1.007276466879; // in Daltons
 
 	///////////////////////////////////////////////////////////////////////
 	// create A as a temporary COO matrix
@@ -278,15 +276,15 @@ BasisFreeformChargeDistribution(vector<Basis*>& bases,
 		mz0 = mzs[js[j]].front() < mz0 ? mzs[js[j]].front() : mz0;
 		mz1 = mzs[js[j]].back() > mz1 ? mzs[js[j]].back() : mz1;
 	}
-	mz0 -= 0.5*peak_width;
-	mz1 += 0.5*peak_width;
+	mz0 -= 0.5*peak_fwhm;
+	mz1 += 0.5*peak_fwhm;
 
 	// calculate output mass range
 	double mass0 = mz0 - proton_mass;
 	double mass1 = max_z * (mz1 - proton_mass);
-	cm.l[0] = mass_res;
-	cm.o[0] = ceil(mass0 * rc);
-	n = floor(mass1 * rc) - cm.o[0] + 1;
+	cm.l[0] = out_res;
+	cm.o[0] = ceil(mass0 / out_interval);
+	n = floor(mass1 / out_interval) - cm.o[0] + 1;
 	cm.n[0] = n * max_z;
 
 	// figure out nnz (number of non-zeros)
@@ -297,8 +295,8 @@ BasisFreeformChargeDistribution(vector<Basis*>& bases,
 		if (gs[is[j] + i] >= 0.0)
 		for (ii z = 0; z < max_z; z++)
 		{
-			double cf0 = (z+1) * (mzs[js[j]][i] - 0.5*peak_width - proton_mass) * rc;
-			double cf1 = (z+1) * (mzs[js[j]][i + 1] + 0.5*peak_width - proton_mass) * rc;
+			double cf0 = (z + 1) * (mzs[js[j]][i] - 0.5*peak_fwhm - proton_mass) / out_interval;
+			double cf1 = (z + 1) * (mzs[js[j]][i + 1] + 0.5*peak_fwhm - proton_mass) / out_interval;
 
 			ii ci0 = (ii)ceil(cf0);
 			ii ci1 = (ii)floor(cf1);
@@ -307,7 +305,6 @@ BasisFreeformChargeDistribution(vector<Basis*>& bases,
 		}
 	}
 
-	//ofstream ofs("A.csv");
 	// populate coo matrix
 	ii done = 0;
 	#pragma omp parallel for
@@ -323,20 +320,21 @@ BasisFreeformChargeDistribution(vector<Basis*>& bases,
 			if (gs[is[j] + i] >= 0.0)
 			for (ii z = 0; z < max_z; z++)
 			{
-				double cf0 = (z + 1) * (mzs[js[j]][i] - 0.5*peak_width - proton_mass) * rc;
-				double cf1 = (z + 1) * (mzs[js[j]][i + 1] + 0.5*peak_width - proton_mass) * rc;
-
+				// compute the range of peak coefficient indicies [ci0, ci1] that overlap with the raw data bin [mzs[js[j]][i], mzs[js[j]][i+1]]   
+				double cf0 = (z + 1) * (mzs[js[j]][i] - 0.5*peak_fwhm - proton_mass) / out_interval;
+				double cf1 = (z + 1) * (mzs[js[j]][i + 1] + 0.5*peak_fwhm - proton_mass) / out_interval;
 				ii ci0 = (ii)ceil(cf0);
 				ii ci1 = (ii)floor(cf1);
 
-				// work out basis coefficients
+				// for each coefficient index, determine what protortion of that peak overlaps with the raw data bin
+				// (Gaussian peak shape is approximated by a cubic b-spline basis function) 
 				for (ii ci = ci0; ci <= ci1; ci++)
 				{
-					double bin0 = (z + 1) * (mzs[js[j]][i] - proton_mass) * rc;
-					double bin1 = (z + 1) * (mzs[js[j]][i + 1] - proton_mass) * rc;
+					double bin0 = (z + 1) * (mzs[js[j]][i] - proton_mass) / out_interval;
+					double bin1 = (z + 1) * (mzs[js[j]][i + 1] - proton_mass) / out_interval;
 
-					double basis0 = ci - (z + 1)*rc*0.5*peak_width;
-					double basis1 = ci + (z + 1)*rc*0.5*peak_width;
+					double basis0 = ci - (z + 1)*0.5*peak_fwhm / out_interval;
+					double basis1 = ci + (z + 1)*0.5*peak_fwhm / out_interval;
 
 					// intersection of bin and basis
 					double b0 = bin0 > basis0 ? (bin0 - basis0) / (basis1 - basis0) : 0.0;
@@ -490,7 +488,7 @@ write_cs(const std::vector<fp>& cs)
 	{
 		if (sum[i] > 0.0 || i > 0 && sum[i - 1] > 0.0 || i < n - 1 && sum[i + 1] > 0.0)
 		{
-			ofs << i << "," << (cm.o[0] + i) / rc;
+			ofs << i << "," << (cm.o[0] + i) * out_interval;
 			for (ii z = 0; z < max_z; z++) ofs << "," << cs[i*max_z + z];
 			ofs << endl;
 		}

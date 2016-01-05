@@ -69,14 +69,14 @@ protected:
 	std::vector< std::vector<fp> > a;
 	std::vector< std::vector<ii> > ia, ja;
 
-	double rc; // resolution of output (in Daltons)
+	double out_interval; // interval between output coefficients (in Daltons)
 	ii n, max_z;
 
 public:
 	BasisFreeformChargeDistribution(std::vector<Basis*>& bases,
 		const std::vector< std::vector<double> >& mzs,
 		const std::vector<fp>& gs, const std::vector<li>& is, const std::vector<ii>& js,
-		ii mass_res, ii max_z, double max_peak_width,
+		ii out_res, ii max_z, double peak_fwhm,
 		bool transient = false);
 
 	~BasisFreeformChargeDistribution();
