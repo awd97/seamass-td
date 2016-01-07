@@ -37,7 +37,7 @@ BasisUniformChargeDistribution::
 BasisUniformChargeDistribution(vector<Basis*>& bases,
                         const vector< vector<double> >& mzs,
                         const vector<fp>& gs, const vector<li>& _is, const vector<ii>& js,
-                        ii mass_res, ii max_z, double peak_fwhm,
+                        ii mass_res, ii max_z, double peak_width,
                         bool transient) :
     Basis(bases, 2, 0, transient),
     is(_is),
@@ -69,8 +69,8 @@ BasisUniformChargeDistribution(vector<Basis*>& bases,
         mz0 = mzs[js[j]].front() < mz0 ? mzs[js[j]].front() : mz0;
         mz1 = mzs[js[j]].back() > mz1 ? mzs[js[j]].back() : mz1;
     }
-	mz0 -= 0.5*peak_fwhm;
-	mz1 += 0.5*peak_fwhm;
+	mz0 -= 0.5*peak_width;
+	mz1 += 0.5*peak_width;
 
 	// calculate output mass range
 	double mass0 = mz0 - proton_mass;
@@ -86,8 +86,8 @@ BasisUniformChargeDistribution(vector<Basis*>& bases,
 	if (gs[is[j] + i] >= 0.0)
 	for (ii z = 1; z <= max_z; z++)
 	{
-		double cf0 = z * (mzs[js[j]][i] - 0.5*peak_fwhm - proton_mass) * rc;
-		double cf1 = z * (mzs[js[j]][i + 1] + 0.5*peak_fwhm - proton_mass) * rc;
+		double cf0 = z * (mzs[js[j]][i] - 0.5*peak_width - proton_mass) * rc;
+		double cf1 = z * (mzs[js[j]][i + 1] + 0.5*peak_width - proton_mass) * rc;
 
 		ii ci0 = (ii) ceil(cf0);
 		ii ci1 = (ii) floor(cf1);
@@ -110,8 +110,8 @@ BasisUniformChargeDistribution(vector<Basis*>& bases,
 			if (gs[is[j] + i] >= 0.0)
 			for (ii z = 1; z <= max_z; z++)
 			{
-				double cf0 = z * (mzs[js[j]][i] - 0.5*peak_fwhm - proton_mass) * rc;
-				double cf1 = z * (mzs[js[j]][i + 1] + 0.5*peak_fwhm - proton_mass) * rc;
+				double cf0 = z * (mzs[js[j]][i] - 0.5*peak_width - proton_mass) * rc;
+				double cf1 = z * (mzs[js[j]][i + 1] + 0.5*peak_width - proton_mass) * rc;
 
 				ii ci0 = (ii)ceil(cf0);
 				ii ci1 = (ii)floor(cf1);
@@ -122,8 +122,8 @@ BasisUniformChargeDistribution(vector<Basis*>& bases,
 					double bin0 = z * (mzs[js[j]][i] - proton_mass) * rc;
 					double bin1 = z * (mzs[js[j]][i + 1] - proton_mass) * rc;
 
-					double basis0 = ci - z*rc*0.5*peak_fwhm;
-					double basis1 = ci + z*rc*0.5*peak_fwhm;
+					double basis0 = ci - z*rc*0.5*peak_width;
+					double basis1 = ci + z*rc*0.5*peak_width;
 
 					// intersection of bin and basis
 					double b0 = bin0 > basis0 ? (bin0 - basis0) / (basis1 - basis0) : 0.0;
@@ -241,6 +241,12 @@ write_cs(const std::vector<fp>& cs)
 }
 
 
+double peak_width(double fwhm, double mz)
+{
+	return (400.0 / (sqrt(400.0 / mz) * fwhm)) / 0.361175; // fwhm of cubic basis function of unit width is 0.361175 
+}
+
+
 BasisFreeformChargeDistribution::
 BasisFreeformChargeDistribution(vector<Basis*>& bases,
                                 const vector< vector<double> >& mzs,
@@ -278,8 +284,8 @@ BasisFreeformChargeDistribution(vector<Basis*>& bases,
 		mz0 = mzs[js[j]].front() < mz0 ? mzs[js[j]].front() : mz0;
 		mz1 = mzs[js[j]].back() > mz1 ? mzs[js[j]].back() : mz1;
 	}
-	mz0 -= 0.5*peak_fwhm;
-	mz1 += 0.5*peak_fwhm;
+	mz0 -= 0.5*peak_width(peak_fwhm, mz0);
+	mz1 += 0.5*peak_width(peak_fwhm, mz1);
 
 	// calculate output mass range
 	double mass0 = mz0 - proton_mass;
@@ -297,8 +303,8 @@ BasisFreeformChargeDistribution(vector<Basis*>& bases,
 		if (gs[is[j] + i] >= 0.0)
 		for (ii z = 0; z < max_z; z++)
 		{
-			double cf0 = (z + 1) * (mzs[js[j]][i] - 0.5*peak_fwhm - proton_mass) / out_interval;
-			double cf1 = (z + 1) * (mzs[js[j]][i + 1] + 0.5*peak_fwhm - proton_mass) / out_interval;
+			double cf0 = (z + 1) * (mzs[js[j]][i] - 0.5*peak_width(peak_fwhm, mzs[js[j]][i]) - proton_mass) / out_interval;
+			double cf1 = (z + 1) * (mzs[js[j]][i + 1] + 0.5*peak_width(peak_fwhm, mzs[js[j]][i + 1]) - proton_mass) / out_interval;
 
 			ii ci0 = (ii)ceil(cf0);
 			ii ci1 = (ii)floor(cf1);
@@ -323,8 +329,9 @@ BasisFreeformChargeDistribution(vector<Basis*>& bases,
 			for (ii z = 0; z < max_z; z++)
 			{
 				// compute the range of peak coefficient indicies [ci0, ci1] that overlap with the raw data bin [mzs[js[j]][i], mzs[js[j]][i+1]]   
-				double cf0 = (z + 1) * (mzs[js[j]][i] - 0.5*peak_fwhm - proton_mass) / out_interval;
-				double cf1 = (z + 1) * (mzs[js[j]][i + 1] + 0.5*peak_fwhm - proton_mass) / out_interval;
+				
+				double cf0 = (z + 1) * (mzs[js[j]][i] - 0.5*peak_width(peak_fwhm, mzs[js[j]][i]) - proton_mass) / out_interval;
+				double cf1 = (z + 1) * (mzs[js[j]][i + 1] + 0.5*peak_width(peak_fwhm, mzs[js[j]][i + 1]) - proton_mass) / out_interval;
 				ii ci0 = (ii)ceil(cf0);
 				ii ci1 = (ii)floor(cf1);
 
@@ -332,15 +339,14 @@ BasisFreeformChargeDistribution(vector<Basis*>& bases,
 				// (Gaussian peak shape is approximated by a cubic b-spline basis function) 
 				for (ii ci = ci0; ci <= ci1; ci++)
 				{
-					double bin0 = (z + 1) * (mzs[js[j]][i] - proton_mass) / out_interval;
-					double bin1 = (z + 1) * (mzs[js[j]][i + 1] - proton_mass) / out_interval;
-
-					double basis0 = ci - (z + 1)*0.5*peak_fwhm / out_interval;
-					double basis1 = ci + (z + 1)*0.5*peak_fwhm / out_interval;
+					double basisM = (ci * out_interval) / (z+1) + proton_mass;
+					double pw = peak_width(peak_fwhm, basisM);
+					double basis0 = basisM - 0.5*pw;
+					double basis1 = basisM + 0.5*pw;
 
 					// intersection of bin and basis
-					double b0 = bin0 > basis0 ? (bin0 - basis0) / (basis1 - basis0) : 0.0;
-					double b1 = bin1 < basis1 ? (bin1 - basis0) / (basis1 - basis0) : 1.0;
+					double b0 = mzs[js[j]][i] > basis0 ? (mzs[js[j]][i] - basis0) / (basis1 - basis0) : 0.0;
+					double b1 = mzs[js[j]][i+1] < basis1 ? (mzs[js[j]][i+1] - basis0) / (basis1 - basis0) : 1.0;
 
 					// basis coefficient b is _integral_ of area under b-spline basis
 					double b = bspline.ibasis(b1) - bspline.ibasis(b0);
@@ -349,8 +355,6 @@ BasisFreeformChargeDistribution(vector<Basis*>& bases,
 					acoo[k] = b;
 					rowind[k] = i;
 					colind[k] = max_z * (ci - cm.o[0]) + z;
-
-					//ofs << setprecision(10) << b << "," << 0.5*(mzs[js[j]][i] + mzs[js[j]][i + 1]) << "," << get_mass(ci - cm.o[0]) << endl;
 
 					k++;
 				}
