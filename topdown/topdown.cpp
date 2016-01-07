@@ -22,6 +22,7 @@
 
 #include "topdown.hpp"
 #include "BasisChargeDistribution.hpp"
+#include "BasisIsotopeDistribution.hpp"
 #include "../core/OptimiserASRL.hpp"
 #include <fstream>
 #include <sstream>
@@ -77,11 +78,13 @@ namespace seamass
 		vector<Basis*> bases;
 		ii order = 3; // B-spline order
 
-		// Construct BasisResampleMZ root node
+		// Construct BasisChargeDistribution, which gets added as the root node of bases
 		//BasisUniformChargeDistribution bChargeDistribution(bases, mzs, gs, is, js, mass_res, max_z, max_peak_width);
-		BasisFreeformChargeDistribution bChargeDistribution(bases, mzs, gs, is, js, mass_res, max_z, max_peak_width);
+		BasisFreeformChargeDistribution bChargeDistribution(bases, mzs, gs, is, js, mass_res, max_z, max_peak_width, true);
 		for (ii j = 0; j < (ii)mzs.size(); j++) vector<double>().swap(mzs[j]);
-		//cout << endl << setprecision(8) << " mz_min=" << mz_min << " mz_max=" << mz_max << "Spectrometry mz_res=" << pow(2.0, (double)-rc_mz) << endl;
+
+		// Construct BasisIsotopeDistribution, which gets added to bases with bChargeDistribution as parent
+		BasisIsotopeDistribution bIsotopeDistribution(bases, &bChargeDistribution);
 
 		////////////////////////////////////////////////////////////////////////////////////
 		// OPTIMISATION
@@ -151,7 +154,7 @@ namespace seamass
 
 		//////////////////////////////////////////////////////////////////////////////////
 		// OUTPUT
-		bChargeDistribution.write_cs(optimiser.get_cs()[bChargeDistribution.get_index()]);
+		bChargeDistribution.write_cs(optimiser.get_cs()[bIsotopeDistribution.get_index()]);
 
 		////////////////////////////////////////////////////////////////////////////////////
 		omp_set_num_threads(_threads);

@@ -8,6 +8,8 @@ add_library(seamass_topdown STATIC
   topdown.cpp
   BasisChargeDistribution.hpp
   BasisChargeDistribution.cpp
+  BasisIsotopeDistribution.hpp
+  BasisIsotopeDistribution.cpp
 )
 
 include(GenerateExportHeader)

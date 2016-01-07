@@ -372,7 +372,7 @@ BasisFreeformChargeDistribution(vector<Basis*>& bases,
 			}
 		}
 
-		// create A and free coo
+		// create A
 		a[j].resize(nnz[j]);
 		ia[j].resize(m[j] + 1);
 		ja[j].resize(nnz[j]);
@@ -384,11 +384,24 @@ BasisFreeformChargeDistribution(vector<Basis*>& bases,
 
 	cout << index << " BasisFreeformChargeDistribution ";
 	cm.print(cout);
-	li size = is.back();
-	for (ii j = 0; j < a.size(); j++) size += 2 * nnz[j] + 1;
-	cout << " mem=" << setprecision(2) << fixed << (sizeof(this) + size*sizeof(fp)) / (1024.0*1024.0) << "Mb";
+
+	li size = 0;
+	size += sizeof(is) + sizeof(li) * is.capacity();
+	size += sizeof(nnz) + sizeof(ii) * nnz.capacity();
+	size += sizeof(m) + sizeof(ii) * m.capacity();
+	for (ii j = 0; j < a.size(); j++)
+	{
+		size += sizeof(a[j]) + sizeof(fp) * a[j].capacity();
+		size += sizeof(ia[j]) + sizeof(ii) * ia[j].capacity();
+		size += sizeof(ja[j]) + sizeof(ii) * ja[j].capacity();
+	}
+	cout << " mem=" << setprecision(2) << fixed << size / (1024.0*1024.0) << "Mb";
 	if (transient) cout << " (t)";
 	cout << endl;
+	for (ii j = 0; j < a.size(); j++)
+	{
+		cout << "    A[" << j << "]=[" << m[j] << "," << cm.n[0] << "]:" << nnz[j] << endl;
+	}
 }
 
 
