@@ -52,7 +52,7 @@ namespace seamass
 	void
 	topdown(const std::string& id, const std::string& config_id, int instrument_type,
 		    vector<double>& rts, vector< vector<double> >& mzs, vector< vector<double> >& intensities,
-		    ii mass_res, ii max_z, double max_peak_width, int shrink, int tol,
+		    ii out_res, ii max_z, double max_peak_width, int shrink, int tol,
 		    int threads, int debug)
 	{
 		double start = omp_get_wtime();
@@ -79,12 +79,11 @@ namespace seamass
 		ii order = 3; // B-spline order
 
 		// Construct BasisChargeDistribution, which gets added as the root node of bases
-		//BasisUniformChargeDistribution bChargeDistribution(bases, mzs, gs, is, js, mass_res, max_z, max_peak_width);
-		BasisFreeformChargeDistribution bChargeDistribution(bases, mzs, gs, is, js, mass_res, max_z, max_peak_width, true);
+		BasisChargeDistribution bChargeDistribution(bases, mzs, gs, is, js, 1.00286084990559, out_res, 0, max_z, max_peak_width, false);
 		for (ii j = 0; j < (ii)mzs.size(); j++) vector<double>().swap(mzs[j]);
 
 		// Construct BasisIsotopeDistribution, which gets added to bases with bChargeDistribution as parent
-		BasisIsotopeDistribution bIsotopeDistribution(bases, &bChargeDistribution);
+		//BasisIsotopeDistribution bIsotopeDistribution(bases, &bChargeDistribution, out_res, 0, max_z);
 
 		////////////////////////////////////////////////////////////////////////////////////
 		// OPTIMISATION
@@ -100,7 +99,7 @@ namespace seamass
 		li nc = 0;
 		for (ii j = 0; j < (ii)bases.size(); j++)
 		if (!bases[j]->is_transient())
-			nc += bases[j]->get_cm().size();
+			nc += bases[j]->get_nc();
 		cout << " L1 nc=" << nc << " shrinkage=" << shrink << ":" << fixed << setprecision(2) << shrinkage << " tolerance=" << tol << ":" << setprecision(6) << tolerance << endl;
 
 		for (ii i = 0; grad > tolerance; i++)
@@ -110,7 +109,7 @@ namespace seamass
 			li nnz = 0;
 			for (ii j = 0; j < (ii)bases.size(); j++)
 			if (!bases[j]->is_transient())
-			for (ii i = 0; i < (ii)bases[j]->get_cm().size(); i++)
+			for (ii i = 0; i < (ii)bases[j]->get_nc(); i++)
 			if (optimiser.get_cs()[j][i] > thres)
 			{
 				nnz++;
@@ -137,7 +136,7 @@ namespace seamass
 			li nnz = 0;
 			for (ii j = 0; j < (ii)bases.size(); j++)
 			if (!bases[j]->is_transient())
-			for (ii i = 0; i < (ii)bases[j]->get_cm().size(); i++)
+			for (ii i = 0; i < (ii)bases[j]->get_nc(); i++)
 			if (optimiser.get_cs()[j][i] > thres)
 			{
 				nnz++;
@@ -154,7 +153,7 @@ namespace seamass
 
 		//////////////////////////////////////////////////////////////////////////////////
 		// OUTPUT
-		bChargeDistribution.write_cs(optimiser.get_cs()[bIsotopeDistribution.get_index()]);
+		bChargeDistribution.write_cs(optimiser.get_cs()[bChargeDistribution.get_index()]);
 
 		////////////////////////////////////////////////////////////////////////////////////
 		omp_set_num_threads(_threads);

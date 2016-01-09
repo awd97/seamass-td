@@ -24,13 +24,7 @@
 #define _SEAMASS_CORE_CORE_HPP_
 
 
-#include <mkl.h>
-#include <vector>
-
-
-typedef float fp; // fp is the selected floating point precision (float or double)
-typedef MKL_INT ii; // ii is the selected indexing integer size (32 or 64 bit)
-typedef long long li; // 64bit integer
+#include "SparseMatrixMKL.hpp"
 
 
 namespace utils

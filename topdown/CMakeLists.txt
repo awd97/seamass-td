@@ -3,17 +3,17 @@ find_package(MKL REQUIRED)
 
 # gcc doesn't like SHARED build atm
 #add_library(seamass_topdown SHARED
-add_library(seamass_topdown STATIC
+add_library(seamass_topdown
   topdown.hpp
   topdown.cpp
   BasisChargeDistribution.hpp
   BasisChargeDistribution.cpp
-  BasisIsotopeDistribution.hpp
-  BasisIsotopeDistribution.cpp
+  #BasisIsotopeDistribution.hpp
+  #BasisIsotopeDistribution.cpp
 )
 
-include(GenerateExportHeader)
-generate_export_header(seamass_topdown)
+#include(GenerateExportHeader)
+#generate_export_header(seamass_topdown)
 
 target_include_directories(seamass_topdown PUBLIC
   ${CMAKE_BINARY_DIR}/topdown

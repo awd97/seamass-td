@@ -20,30 +20,45 @@
 //
 
 
-#ifndef _SEAMASS_TOPDOWN_TOPDOWN_HPP_
-#define _SEAMASS_TOPDOWN_TOPDOWN_HPP_
+#ifndef _SEAMASS_CORE_SPARSEMATRIX_HPP_
+#define _SEAMASS_CORE_SPARSEMATRIX_HPP_
 
 
-//#include "seamass_topdown_export.h"
+#include <mkl.h>
+#include <iostream>
 #include <vector>
-#include <string>
 
 
-namespace seamass
+typedef float fp; // fp is the selected floating point precision (float or double)
+typedef MKL_INT ii; // ii is the selected indexing integer size (32 or 64 bit)
+typedef long long li; // 64bit integer
+
+
+class SparseMatrix
 {
-	//SEAMASS_TOPDOWN_EXPORT
-	void topdown_notice();
+private:
+	ii m;
+	ii n;
 
-	//SEAMASS_TOPDOWN_EXPORT
-	void topdown(const std::string& id,
-				 const std::string& config_id,
-				 int instrument_type,
-				 std::vector<double>& rts,
-				 std::vector< std::vector<double> >& mzs,
-				 std::vector< std::vector<double> >& intensities,
-				 int out_res, int max_z, double max_peak_width, int shrink, int tol,
-				 int threads = 1, int debug = 0);
-}
+	fp* a;
+	ii* ia;
+	ii* ja;
+
+public:
+	SparseMatrix();
+	~SparseMatrix();
+
+	void init(ii m, ii n, std::vector<fp>& acoo, std::vector<ii>& rowind, std::vector<ii>& colind);
+
+	void mult(fp* bs, const fp* xs, bool transpose = false, bool accum = false) const;
+	void sqr_mult(fp* bs, const fp* xs, bool transpose = false, bool accum = false) const;
+
+	ii get_m() const { return m; }
+	ii get_n() const { return n; }
+
+	void print(std::ostream& out) const;
+};
 
 
 #endif
+

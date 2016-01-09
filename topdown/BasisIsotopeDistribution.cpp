@@ -22,6 +22,7 @@
 
 #include "BasisIsotopeDistribution.hpp"
 #include <limits>
+#include <map>
 #include <fstream>
 #include <iomanip>
 #include <cmath>
@@ -30,9 +31,57 @@ using namespace std;
 
 
 BasisIsotopeDistribution::
-BasisIsotopeDistribution(vector<Basis*>& bases, Basis* parent, bool transient) :
+BasisIsotopeDistribution(vector<Basis*>& bases, Basis* parent,
+                         ii out_res, ii factor_res, ii max_z,
+                         bool transient) :
 	Basis(bases, parent->get_cm().d, parent, transient)
 {
+	cout << index << " BasisIsotopeDistribution " << flush;
+
+	ifstream ifs("seamass-td.factors");
+	//ofstream ofs("grr");
+	multimap< ii, vector<fp> > factors;
+	ii i0 = parent->get_cm().o[0] / (1 << (out_res - factor_res));
+	ii i1 = (parent->get_cm().o[0] + parent->get_cm().n[0] / max_z) / (1 << (out_res - factor_res));
+	//cout << "i:[" << i0 << "," << i1 << "]" << endl;
+
+	while (ifs.good())
+	{
+		char comma;
+		ii i, z, id;
+		ifs >> i;
+		if (i < i0) { ifs.ignore(65535, '\n'); continue; }
+		if (i > i1) break;
+		
+		ifs >> comma >> z >> comma >> id;
+		map< ii, vector<fp> >::iterator elem = factors.insert(pair< ii, vector<fp> >(i, vector<fp>()));
+		for (ii j = 0; j < 21; j++)
+		{
+			fp isotope;
+			ifs >> comma >> isotope;
+			if (elem->second.size() > 0 && isotope <= elem->second.back() && isotope < 0.00001)
+			{
+				ifs.ignore(65535, '\n');
+				break;
+			}
+			else
+			{
+				elem->second.push_back(isotope);
+			}
+			//cout << " " << isotope << endl;
+		}
+		//ofs << i << " " << z << " " << id << " " << elem->second.size() << endl;
+
+		if (i % 10000 == 0)
+		{
+			for (int i = 0; i < 256; ++i) cout << '\b';
+			cout << index << " BasisIsotopeDistribution " << setw(1 + (int)(log10((float)i1))) << i0 << "/" << i << "/" << i1 << " " << flush;
+		}
+	}
+	for (int i = 0; i < 256; ++i) cout << '\b';
+	cout << index << " BasisIsotopeDistribution " << flush;
+
+
 	///////////////////////////////////////////////////////////////////////
 	// create A as a temporary COO matrix
 
@@ -40,31 +89,25 @@ BasisIsotopeDistribution(vector<Basis*>& bases, Basis* parent, bool transient) :
 
 	m = parent->get_cm().n[0];
 
-	nnz = 0;
-	for (ii i = 0; i < m; i++)
-	{
-		if (i > 32) nnz++;
-		nnz++;
-	}
+	nnz = m;
 	vector<fp> acoo(nnz);
 	vector<ii> rowind(nnz);
 	vector<ii> colind(nnz);
 
 	ii k = 0;
-	for (ii i = 0; i < m; i++)
+	for (ii j = 0; j < cm.n[1]; j++)
+	for (ii i = 0; i < cm.n[0]; i++)
 	{
-		if (i > 32)
+		//ii f = (get_cm().o[0] + i) / (1 << (out_res - factor_res));
+		//find->
+
+		//for (ii z = 0; z < max_z; z++)
 		{
-			acoo[k] = 0.5;
-			rowind[k] = i - 32;
-			colind[k] = i;
+			acoo[k] = 1.0;
+			rowind[k] = k;
+			colind[k] = k;
 			k++;
 		}
-
-		acoo[k] = 0.5;
-		rowind[k] = i;
-		colind[k] = i;
-		k++;
 	}
 
 	a.resize(nnz);

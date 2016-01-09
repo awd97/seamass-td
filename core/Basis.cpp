@@ -29,7 +29,7 @@
 using namespace std;
 
 
-CoeffsMetadata::
+/*CoeffsMetadata::
 CoeffsMetadata(ii _dc) :
 	d(_dc), l(_dc), o(_dc), n(_dc)
 {
@@ -86,14 +86,14 @@ print(ostream& out) const
 		if (i < d - 1) out << ",";
 	}
 	out << "]:" << size();
-}
+}*/
 
 
 Basis::
 Basis(vector<Basis*>& bases, ii dimensions, Basis* _parent, bool _transient) :
     parent(_parent),
     transient(_transient),
-    cm(dimensions),
+    //cm(dimensions),
     volume(0.0),
     discrep(0.0)
 {
@@ -149,7 +149,7 @@ Basis::
 shrink(std::vector<fp>& es, const std::vector<fp>& cs, const std::vector<fp>& l2, const std::vector<fp>& wcs, double shrinkage)
 {
 	#pragma omp parallel for
-	for (li i = 0; i < (li)cm.size(); i++)
+	for (li i = 0; i < es.size(); i++)
 	if (es[i] >= FLT_MIN && cs[i] >= FLT_MIN)
 	{
 		es[i] *= cs[i] / (shrinkage * l2[i] + wcs[i]);

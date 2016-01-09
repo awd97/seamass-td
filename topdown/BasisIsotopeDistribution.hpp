@@ -37,7 +37,9 @@ protected:
 	std::vector<ii> ia, ja;
 
 public:
-	BasisIsotopeDistribution(std::vector<Basis*>& bases, Basis* parent, bool transient = false);
+	BasisIsotopeDistribution(std::vector<Basis*>& bases, Basis* parent,
+		                     ii out_res, ii factor_res, ii max_z,
+							 bool transient = false);
 
 	~BasisIsotopeDistribution();
 

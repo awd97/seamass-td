@@ -23,340 +23,140 @@
 #include "BasisChargeDistribution.hpp"
 #include <limits>
 #include <fstream>
+#include <sstream>
 #include <iomanip>
 #include <cmath>
 #include <cfloat>
 using namespace std;
 
 
-double proton_mass = 1.007276466879; // in Daltons
-double isotope_interval = 1.00286084990559; // average difference between monoisotope and second isotope peaks
+double
+BasisChargeDistribution::
+proton_mass = 1.007276466879; // in Daltons
 
-
-BasisUniformChargeDistribution::
-BasisUniformChargeDistribution(vector<Basis*>& bases,
-                        const vector< vector<double> >& mzs,
-                        const vector<fp>& gs, const vector<li>& _is, const vector<ii>& js,
-                        ii mass_res, ii max_z, double peak_width,
-                        bool transient) :
-    Basis(bases, 2, 0, transient),
-    is(_is),
-	rc(isotope_interval / pow(2.0, (double) mass_res))
-{
-	BSpline bspline(3, 65535);
-
-    ///////////////////////////////////////////////////////////////////////
-    // create A as a temporary COO matrix
-    
-    // calculate indicies of non-empty spectra
-    cm.l[1] = numeric_limits<ii>::min();
-    cm.o[1] = numeric_limits<ii>::min();
-    cm.n[1] = js.size();
-
-    // init arrays
-    a.resize(cm.n[1]);
-    ia.resize(cm.n[1]);
-    ja.resize(cm.n[1]);
-    m.resize(cm.n[1]);
-    nnz.resize(cm.n[1], 0);
-
-    // find min and max m/z across spectra
-    double mz0 = DBL_MAX;
-    double mz1 = 0.0;
-    for (ii j = 0; j < cm.n[1]; j++)
-    {
-        m[j] = (ii) (is[j+1] - is[j]);
-        mz0 = mzs[js[j]].front() < mz0 ? mzs[js[j]].front() : mz0;
-        mz1 = mzs[js[j]].back() > mz1 ? mzs[js[j]].back() : mz1;
-    }
-	mz0 -= 0.5*peak_width;
-	mz1 += 0.5*peak_width;
-
-	// calculate output mass range
-	double mass0 = mz0 - proton_mass;
-	double mass1 = max_z * (mz1 - proton_mass);
-    cm.l[0] = mass_res;
-	cm.o[0] = ceil(mass0 * rc);
-	cm.n[0] = floor(mass1 * rc) - cm.o[0] + 1;
-
-    // figure out nnz (number of non-zeros)
-    #pragma omp parallel for
-	for (ii j = 0; j < cm.n[1]; ++j)
-	for (ii i = 0; i < m[j]; i++)
-	if (gs[is[j] + i] >= 0.0)
-	for (ii z = 1; z <= max_z; z++)
-	{
-		double cf0 = z * (mzs[js[j]][i] - 0.5*peak_width - proton_mass) * rc;
-		double cf1 = z * (mzs[js[j]][i + 1] + 0.5*peak_width - proton_mass) * rc;
-
-		ii ci0 = (ii) ceil(cf0);
-		ii ci1 = (ii) floor(cf1);
-
-		nnz[j] += ci1 - ci0 + 1;
-	}
-
-	// populate coo matrix
-    ii done = 0;
-    #pragma omp parallel for
-    for(ii j = 0; j < cm.n[1]; ++j)
-    {
-        vector<fp> acoo(nnz[j]);
-        vector<ii> rowind(nnz[j]);
-        vector<ii> colind(nnz[j]);
-        
-        ii k = 0;
-		for (ii i = 0; i < m[j]; i++)
-		{
-			if (gs[is[j] + i] >= 0.0)
-			for (ii z = 1; z <= max_z; z++)
-			{
-				double cf0 = z * (mzs[js[j]][i] - 0.5*peak_width - proton_mass) * rc;
-				double cf1 = z * (mzs[js[j]][i + 1] + 0.5*peak_width - proton_mass) * rc;
-
-				ii ci0 = (ii)ceil(cf0);
-				ii ci1 = (ii)floor(cf1);
-
-				// work out basis coefficients
-				for (ii ci = ci0; ci <= ci1; ci++)
-				{
-					double bin0 = z * (mzs[js[j]][i] - proton_mass) * rc;
-					double bin1 = z * (mzs[js[j]][i + 1] - proton_mass) * rc;
-
-					double basis0 = ci - z*rc*0.5*peak_width;
-					double basis1 = ci + z*rc*0.5*peak_width;
-
-					// intersection of bin and basis
-					double b0 = bin0 > basis0 ? (bin0 - basis0) / (basis1 - basis0) : 0.0;
-					double b1 = bin1 < basis1 ? (bin1 - basis0) / (basis1 - basis0) : 1.0;
-
-					// basis coefficient b is _integral_ of area under b-spline basis
-					double b = bspline.ibasis(b1) - bspline.ibasis(b0);
-					if (b <= FLT_MIN) b = FLT_MIN;
-
-					acoo[k] = b;
-					rowind[k] = i;
-					colind[k] = ci - cm.o[0];
-
-					k++;
-				}
-			}
-
-			// display progress update
-			#pragma omp critical
-			{
-				done++;
-				if (done % 10000 == 0)
-				{
-					for (int i = 0; i < 256; ++i) cout << '\b';
-					cout << index << " BasisUniformChargeDistribution " << setw(1 + (int)(log10((float)m[j] * cm.n[1]))) << done << "/" << m[j]*cm.n[1] << " " << flush;
-				}
-			}
-		}
-        
-        // create A and free coo
-        a[j].resize(nnz[j]);
-        ia[j].resize(m[j]+1);
-        ja[j].resize(nnz[j]);
-        
-        ii job[] = {2, 0, 0, 0, nnz[j], 0}; ii info;
-        mkl_scsrcoo(job, &m[j], a[j].data(), ja[j].data(), ia[j].data(), &(nnz[j]), acoo.data(), rowind.data(), colind.data(), &info);
-    }
-    for (int i = 0; i < 256; ++i) cout << '\b';
-    
-    cout << index << " BasisUniformChargeDistribution ";
-    cm.print(cout);
-    li size = is.back();
-    for (ii j = 0; j < a.size(); j++) size += 2*nnz[j]+1;
-    cout << " mem=" << setprecision(2) << fixed << (sizeof(this)+size*sizeof(fp))/(1024.0*1024.0) << "Mb";
-    if (transient) cout << " (t)";
-    cout << endl;
-}
-
-
-BasisUniformChargeDistribution::~BasisUniformChargeDistribution()
-{
-}
-
-
-void
-BasisUniformChargeDistribution::
-synthesis(vector<fp>& fs, const vector<fp>& cs, bool accum)
-{
-    static fp alpha = 1.0;
-    fp beta = accum ? 1.0 : 0.0;
-    # pragma omp parallel for
-    for (li j = 0; j < cm.n[1]; j++)
-    {
-        fp* c = const_cast<fp*>(&(cs.data()[j*cm.n[0]]));
-        mkl_scsrmv("N", &(m[j]), &(cm.n[0]), &alpha, "G**C", a[j].data(), ja[j].data(), ia[j].data(), &(ia[j].data()[1]), c, &beta, &(fs.data()[is[j]]));
-    }
-}
-
-
-void
-BasisUniformChargeDistribution::
-analysis(vector<fp>& es, const vector<fp>& fs)
-{
-    static fp alpha = 1.0, beta = 0.0;
-    //# pragma omp parallel for
-    for (li j = 0; j < cm.n[1]; j++)
-    {
-        fp* f = const_cast<fp*>(&(fs.data()[is[j]]));
-         mkl_scsrmv("T", &(m[j]), &(cm.n[0]), &alpha, "G**C", a[j].data(), ja[j].data(), ia[j].data(), &(ia[j].data()[1]), f, &beta, &(es.data()[j*cm.n[0]]));
-    }
-}
-
-
-void
-BasisUniformChargeDistribution::
-l2norm(vector<fp>& es, const vector<fp>& fs)
-{
-    static fp alpha = 1.0, beta = 0.0;
-    //# pragma omp parallel for
-    for (li j = 0; j < cm.n[1]; j++)
-    {
-        vector<fp> a2(nnz[j]);
-        vsSqr(nnz[j], a[j].data(), a2.data());
-        fp* f = const_cast<fp*>(&(fs.data()[is[j]]));
-        mkl_scsrmv("T", &(m[j]), &(cm.n[0]), &alpha, "G**C", a2.data(), ja[j].data(), ia[j].data(), &(ia[j].data()[1]), f, &beta, &(es.data()[j*cm.n[0]]));
-    }
-}
-
-
-void
-BasisUniformChargeDistribution::
-write_cs(const std::vector<fp>& cs)
-{
-	ofstream ofs("cs.csv");
-
-	ofs << "index,mass,intensity" << endl;
-
-	for (ii i = 0; i < cs.size(); ++i)
-	{
-		if (cs[i] > 0.0 || i > 0 && cs[i - 1] > 0.0 || i < cs.size()-1 && cs[i + 1] > 0.0)
-			ofs << setprecision(10) << i << "," << (cm.o[0] + i) / rc << "," << cs[i] << endl;
-	}
-
-	ofs << endl;
-}
-
-
-double peak_width(double fwhm, double mz)
+double
+BasisChargeDistribution::
+peak_width(double fwhm, double mz)
 {
 	return (400.0 / (sqrt(400.0 / mz) * fwhm)) / 0.361175; // fwhm of cubic basis function of unit width is 0.361175 
 }
 
 
-BasisFreeformChargeDistribution::
-BasisFreeformChargeDistribution(vector<Basis*>& bases,
-                                const vector< vector<double> >& mzs,
-								const vector<fp>& gs, const vector<li>& _is, const vector<ii>& js,
-								ii out_res, ii _max_z, double peak_fwhm,
-								bool transient) :
+BasisChargeDistribution::
+BasisChargeDistribution(vector<Basis*>& bases,
+                        const vector< vector<double> >& mzs,
+						const vector<fp>& gs, const vector<li>& _is, const vector<ii>& js,
+						double _mass_interval, ii out_res, ii factor_res, ii max_z, double peak_fwhm,
+						bool transient) :
 	Basis(bases, 2, 0, transient),
 	is(_is),
-	out_interval(isotope_interval / pow(2.0, (double)out_res)),
-	max_z(_max_z)
+	as(js.size()),
+	ci0s(max_z, numeric_limits<ii>::max()),
+	ci1s(max_z, 0),
+	cos(max_z+1),
+	mass_interval(_mass_interval / pow(2.0, (double)out_res))
 {
-	BSpline bspline(3, 65535);
+	cout << index << " BasisChargeDistribution " << flush;
 
 	///////////////////////////////////////////////////////////////////////
 	// create A as a temporary COO matrix
+	vector<ii> ms(js.size());
+	vector<ii> nnzs(js.size(), 0);
 
-	// calculate indicies of non-empty spectra
-	cm.l[1] = numeric_limits<ii>::min();
-	cm.o[1] = numeric_limits<ii>::min();
-	cm.n[1] = js.size();
-
-	// init arrays
-	a.resize(cm.n[1]);
-	ia.resize(cm.n[1]);
-	ja.resize(cm.n[1]);
-	m.resize(cm.n[1]);
-	nnz.resize(cm.n[1], 0);
-
-	// find min and max m/z across spectra
-	double mz0 = DBL_MAX;
+	// find min (mz0) and max (mz1) m/z across all spectra
+	double mz0 = numeric_limits<double>::max();
 	double mz1 = 0.0;
-	for (ii j = 0; j < cm.n[1]; j++)
+	for (ii j = 0; j < js.size(); j++)
 	{
-		m[j] = (ii)(is[j + 1] - is[j]);
+		ms[j] = (ii)(is[j + 1] - is[j]);
 		mz0 = mzs[js[j]].front() < mz0 ? mzs[js[j]].front() : mz0;
 		mz1 = mzs[js[j]].back() > mz1 ? mzs[js[j]].back() : mz1;
 	}
 	mz0 -= 0.5*peak_width(peak_fwhm, mz0);
 	mz1 += 0.5*peak_width(peak_fwhm, mz1);
 
-	// calculate output mass range
+	// calculate output mass and hence coefficient range
 	double mass0 = mz0 - proton_mass;
 	double mass1 = max_z * (mz1 - proton_mass);
-	cm.l[0] = out_res;
-	cm.o[0] = ceil(mass0 / out_interval);
-	n = floor(mass1 / out_interval) - cm.o[0] + 1;
-	cm.n[0] = n * max_z;
+	ii mi0 = ceil(mass0 / mass_interval);
+	ii mi1 = floor(mass1 / mass_interval);
+	mass0 = mi0 * mass_interval;
+	mass1 = mi1 * mass_interval;
 
-	// figure out nnz (number of non-zeros)
+	// figure out nnz, ci0s and ci1s
 	#pragma omp parallel for
-	for (ii j = 0; j < cm.n[1]; ++j)
+	for (ii j = 0; j < js.size(); ++j)
 	{
-		for (ii i = 0; i < m[j]; i++)
-		if (gs[is[j] + i] >= 0.0)
 		for (ii z = 0; z < max_z; z++)
+		for (ii i = 0; i < ms[j]; i++)
+		if (gs[is[j] + i] >= 0.0)
 		{
-			double cf0 = (z + 1) * (mzs[js[j]][i] - 0.5*peak_width(peak_fwhm, mzs[js[j]][i]) - proton_mass) / out_interval;
-			double cf1 = (z + 1) * (mzs[js[j]][i + 1] + 0.5*peak_width(peak_fwhm, mzs[js[j]][i + 1]) - proton_mass) / out_interval;
+			double cf0 = (z + 1) * (mzs[js[j]][i] - 0.5*peak_width(peak_fwhm, mzs[js[j]][i]) - proton_mass) / mass_interval;
+			double cf1 = (z + 1) * (mzs[js[j]][i + 1] + 0.5*peak_width(peak_fwhm, mzs[js[j]][i + 1]) - proton_mass) / mass_interval;
 
 			ii ci0 = (ii)ceil(cf0);
 			ii ci1 = (ii)floor(cf1);
 
-			nnz[j] += ci1 - ci0 + 1;
+			nnzs[j] += ci1 - ci0 + 1;
+			ci0s[z] = ci0s[z] < ci0 ? ci0s[z] : ci0;
+			ci1s[z] = ci1s[z] > ci1 ? ci1s[z] : ci1;
 		}
 	}
 
+	li nc_per_spectrum = 0;
+	cos[0] = 0;
+	for (ii z = 0; z < max_z; z++)
+	{
+		cos[z+1] = cos[z] + ci1s[z] - ci0s[z] + 1;
+	}
+	nc = cos[max_z] * js.size();
+
 	// populate coo matrix
 	ii done = 0;
+	BSpline bspline(3, 65535); // bspline basis function lookup table
 	#pragma omp parallel for
-	for (ii j = 0; j < cm.n[1]; ++j)
+	for (ii j = 0; j < js.size(); ++j)
 	{
-		vector<fp> acoo(nnz[j]);
-		vector<ii> rowind(nnz[j]);
-		vector<ii> colind(nnz[j]);
+		vector<fp> acoo(nnzs[j]);
+		vector<ii> rowind(nnzs[j]);
+		vector<ii> colind(nnzs[j]);
 
 		ii k = 0;
-		for (ii i = 0; i < m[j]; i++)
+		for (ii z = 0; z < max_z; z++)
 		{
-			if (gs[is[j] + i] >= 0.0)
-			for (ii z = 0; z < max_z; z++)
+			for (ii i = 0; i < ms[j]; i++)
 			{
-				// compute the range of peak coefficient indicies [ci0, ci1] that overlap with the raw data bin [mzs[js[j]][i], mzs[js[j]][i+1]]   
-				
-				double cf0 = (z + 1) * (mzs[js[j]][i] - 0.5*peak_width(peak_fwhm, mzs[js[j]][i]) - proton_mass) / out_interval;
-				double cf1 = (z + 1) * (mzs[js[j]][i + 1] + 0.5*peak_width(peak_fwhm, mzs[js[j]][i + 1]) - proton_mass) / out_interval;
-				ii ci0 = (ii)ceil(cf0);
-				ii ci1 = (ii)floor(cf1);
-
-				// for each coefficient index, determine what protortion of that peak overlaps with the raw data bin
-				// (Gaussian peak shape is approximated by a cubic b-spline basis function) 
-				for (ii ci = ci0; ci <= ci1; ci++)
+				if (gs[is[j] + i] >= 0.0)
 				{
-					double basisM = (ci * out_interval) / (z+1) + proton_mass;
-					double pw = peak_width(peak_fwhm, basisM);
-					double basis0 = basisM - 0.5*pw;
-					double basis1 = basisM + 0.5*pw;
+					// compute the range of peak coefficient indicies [ci0, ci1] that overlap with the raw data bin [mzs[js[j]][i], mzs[js[j]][i+1]]   
+					double cf0 = (z + 1) * (mzs[js[j]][i] - 0.5*peak_width(peak_fwhm, mzs[js[j]][i]) - proton_mass) / mass_interval;
+					double cf1 = (z + 1) * (mzs[js[j]][i + 1] + 0.5*peak_width(peak_fwhm, mzs[js[j]][i + 1]) - proton_mass) / mass_interval;
+					ii ci0 = (ii)ceil(cf0);
+					ii ci1 = (ii)floor(cf1);
 
-					// intersection of bin and basis
-					double b0 = mzs[js[j]][i] > basis0 ? (mzs[js[j]][i] - basis0) / (basis1 - basis0) : 0.0;
-					double b1 = mzs[js[j]][i+1] < basis1 ? (mzs[js[j]][i+1] - basis0) / (basis1 - basis0) : 1.0;
+					// for each coefficient index, determine what proportion of that peak overlaps with the raw data bin
+					// (Gaussian peak shape is approximated by a cubic b-spline basis function) 
+					for (ii ci = ci0; ci <= ci1; ci++)
+					{
+						double basisM = (ci * mass_interval) / (z + 1) + proton_mass;
+						double pw = peak_width(peak_fwhm, basisM);
+						double basis0 = basisM - 0.5*pw;
+						double basis1 = basisM + 0.5*pw;
 
-					// basis coefficient b is _integral_ of area under b-spline basis
-					double b = bspline.ibasis(b1) - bspline.ibasis(b0);
-					if (b <= FLT_MIN) b = FLT_MIN;
+						// intersection of bin and basis
+						double b0 = mzs[js[j]][i] > basis0 ? (mzs[js[j]][i] - basis0) / (basis1 - basis0) : 0.0;
+						double b1 = mzs[js[j]][i + 1] < basis1 ? (mzs[js[j]][i + 1] - basis0) / (basis1 - basis0) : 1.0;
 
-					acoo[k] = b;
-					rowind[k] = i;
-					colind[k] = max_z * (ci - cm.o[0]) + z;
+						// basis coefficient b is _integral_ of area under b-spline basis
+						double b = bspline.ibasis(b1) - bspline.ibasis(b0);
+						if (b <= FLT_MIN) b = FLT_MIN;
 
-					k++;
+						acoo[k] = b;
+						rowind[k] = i;
+						colind[k] = cos[z] + (ci - ci0s[z]);
+
+						k++;
+					}
 				}
 			}
 
@@ -364,123 +164,107 @@ BasisFreeformChargeDistribution(vector<Basis*>& bases,
 			#pragma omp critical
 			{
 				done++;
-				if (done % 10000 == 0)
+				if (done % 1 == 0)
 				{
 					for (int i = 0; i < 256; ++i) cout << '\b';
-					cout << index << " BasisFreeformChargeDistribution " << setw(1 + (int)(log10((float)m[j] * cm.n[1]))) << done << "/" << m[j] * cm.n[1] << " " << flush;
+					cout << index << " BasisChargeDistribution " << setw(1 + (int)(log10((float)js.size()*max_z))) << done << "/" << js.size()*max_z << " " << flush;
 				}
 			}
 		}
 
 		// create A
-		a[j].resize(nnz[j]);
-		ia[j].resize(m[j] + 1);
-		ja[j].resize(nnz[j]);
-
-		ii job[] = { 2, 0, 0, 0, nnz[j], 0 }; ii info;
-		mkl_scsrcoo(job, &m[j], a[j].data(), ja[j].data(), ia[j].data(), &(nnz[j]), acoo.data(), rowind.data(), colind.data(), &info);
+		as[j].init(ms[j], cos[max_z], acoo, rowind, colind);
 	}
 	for (int i = 0; i < 256; ++i) cout << '\b';
 
-	cout << index << " BasisFreeformChargeDistribution ";
-	cm.print(cout);
-
-	li size = 0;
-	size += sizeof(is) + sizeof(li) * is.capacity();
-	size += sizeof(nnz) + sizeof(ii) * nnz.capacity();
-	size += sizeof(m) + sizeof(ii) * m.capacity();
-	for (ii j = 0; j < a.size(); j++)
-	{
-		size += sizeof(a[j]) + sizeof(fp) * a[j].capacity();
-		size += sizeof(ia[j]) + sizeof(ii) * ia[j].capacity();
-		size += sizeof(ja[j]) + sizeof(ii) * ja[j].capacity();
-	}
-	cout << " mem=" << setprecision(2) << fixed << size / (1024.0*1024.0) << "Mb";
+	cout << index << " BasisChargeDistribution";
+	cout << " mass_range=[" << setprecision(2) << mass0 << ":" << setprecision(4) << mass_interval << ":" << setprecision(2) << mass1 << "]Da";
+	cout << " nc=" << nc;
 	if (transient) cout << " (t)";
-	cout << endl;
-	for (ii j = 0; j < a.size(); j++)
+	for (ii j = 0; j < js.size(); j++)
 	{
-		cout << "    A[" << j << "]=[" << m[j] << "," << cm.n[0] << "]:" << nnz[j] << endl;
+		cout << endl;
+		cout << "  A[" << j << "]=";
+		as[j].print(cout);
+	}
+
+	for (ii z = 0; z < max_z; z++)
+	{
+		cout << endl << "  z=" << z+1 << " co=" << cos[z] << " ci_range=[" << ci0s[z] << ":" << ci1s[z] << "]" << flush;
 	}
 }
 
 
-BasisFreeformChargeDistribution::~BasisFreeformChargeDistribution()
+BasisChargeDistribution::~BasisChargeDistribution()
 {
 }
 
 
 void
-BasisFreeformChargeDistribution::
+BasisChargeDistribution::
 synthesis(vector<fp>& fs, const vector<fp>& cs, bool accum)
 {
-	static fp alpha = 1.0;
-	fp beta = accum ? 1.0 : 0.0;
-	# pragma omp parallel for
-	for (li j = 0; j < cm.n[1]; j++)
+	for (li j = 0; j < as.size(); j++)
 	{
-		fp* c = const_cast<fp*>(&(cs.data()[j*cm.n[0]]));
-		mkl_scsrmv("N", &(m[j]), &(cm.n[0]), &alpha, "G**C", a[j].data(), ja[j].data(), ia[j].data(), &(ia[j].data()[1]), c, &beta, &(fs.data()[is[j]]));
+		as[j].mult(&(fs.data()[is[j]]), &(cs.data()[j*as[j].get_n()]), false, accum);
 	}
 }
 
 
 void
-BasisFreeformChargeDistribution::
+BasisChargeDistribution::
 analysis(vector<fp>& es, const vector<fp>& fs)
 {
-	static fp alpha = 1.0, beta = 0.0;
-	//# pragma omp parallel for
-	for (li j = 0; j < cm.n[1]; j++)
+	for (li j = 0; j < as.size(); j++)
 	{
-		fp* f = const_cast<fp*>(&(fs.data()[is[j]]));
-		mkl_scsrmv("T", &(m[j]), &(cm.n[0]), &alpha, "G**C", a[j].data(), ja[j].data(), ia[j].data(), &(ia[j].data()[1]), f, &beta, &(es.data()[j*cm.n[0]]));
+		as[j].mult(&(es.data()[j*as[j].get_n()]), &(fs.data()[is[j]]), true);
 	}
 }
 
 
 void
-BasisFreeformChargeDistribution::
+BasisChargeDistribution::
 l2norm(vector<fp>& es, const vector<fp>& fs)
 {
-	static fp alpha = 1.0, beta = 0.0;
-	//# pragma omp parallel for
-	for (li j = 0; j < cm.n[1]; j++)
+	for (li j = 0; j < as.size(); j++)
 	{
-		vector<fp> a2(nnz[j]);
-		vsSqr(nnz[j], a[j].data(), a2.data());
-		fp* f = const_cast<fp*>(&(fs.data()[is[j]]));
-		mkl_scsrmv("T", &(m[j]), &(cm.n[0]), &alpha, "G**C", a2.data(), ja[j].data(), ia[j].data(), &(ia[j].data()[1]), f, &beta, &(es.data()[j*cm.n[0]]));
+		as[j].sqr_mult(&(es.data()[j*as[j].get_n()]), &(fs.data()[is[j]]), true);
 	}
 }
 
 
 void
-BasisFreeformChargeDistribution::
+BasisChargeDistribution::
 shrink(std::vector<fp>& es, const std::vector<fp>& cs, const std::vector<fp>& l2, const std::vector<fp>& wcs, double shrinkage)
 {
 	// GROUP-WISE SHRINKAGE! (note - intuitive implemention, not mathematically verified yet)
-	#pragma omp parallel for
-	for (ii i = 0; i < n; ++i)
+	// also horrible gather operation
+	for (li j = 0; j < as.size(); j++)
 	{
-		// total of all the coefficients in this group
-		double sum_c = 0.0;
-		for (ii z = 0; z < max_z; z++)
+		vector<fp> gcs(ci1s.back() - ci0s.front() + 1, 0.0);
+
+		// sum up coefficients per group
+		for (ii z = 0; z < cos.size() - 1; z++)
+		for (ii i = cos[z]; i < cos[z + 1]; i++)
+		if (es[j*cos.back() + i] > 0.0)
 		{
-			if (es[i*max_z + z] >= FLT_MIN && cs[i*max_z + z] >= FLT_MIN) sum_c += cs[i*max_z + z];
+			gcs[i - cos[z] + ci0s[z] - ci0s.front()] += cs[j*cos.back() + i];
 		}
 
-		// scale the shrinkage to be protortional to the contribution of this coefficient to the group total
-		for (ii z = 0; z < max_z; z++)
+		// scale the shrinkage to be proportional to the contribution of this coefficient to the group total
+		#pragma omp parallel for
+		for (ii z = 0; z < cos.size(); z++)
+		for (ii i = cos[z]; i < cos[z + 1]; i++)
+		if (es[j*cos.back() + i] > 0.0)
 		{
-			double scale = cs[i*max_z + z] / sum_c;
-			if (es[i*max_z + z] >= FLT_MIN && cs[i*max_z + z] >= FLT_MIN)
+			if (cs[j*cos.back() + i] > 0.0)
 			{
-				es[i*max_z + z] *= cs[i*max_z + z] / (scale * shrinkage * l2[i*max_z + z] + wcs[i*max_z + z]);
+				double scale = cs[j*cos.back() + i] / gcs[i - cos[z] + ci0s[z] - ci0s.front()];
+				es[j*cos.back() + i] *= cs[j*cos.back() + i] / (scale * shrinkage * l2[j*cos.back() + i] + wcs[j*cos.back() + i]);
 			}
 			else
 			{
-				es[i*max_z + z] = 0.0;
+				es[j*cos.back() + i] = 0.0;
 			}
 		}
 	}
@@ -488,30 +272,29 @@ shrink(std::vector<fp>& es, const std::vector<fp>& cs, const std::vector<fp>& l2
 
 
 void
-BasisFreeformChargeDistribution::
+BasisChargeDistribution::
 write_cs(const std::vector<fp>& cs)
 {
-	ofstream ofs("cs.csv");
-
-	vector<fp> sum(n, 0.0);
-	for (ii i = 0; i < n; ++i)
+	for (li j = 0; j < as.size(); j++)
 	{
-		for (ii z = 0; z < max_z; z++) sum[i] += cs[i*max_z + z];
-	}
+		ostringstream oss; oss << "profile" << j << ".csv";
+		ofstream ofs(oss.str());
 
-	ofs << "index,mass";
-	for (ii z = 0; z < max_z; z++) ofs << ",z=" << z+1;
-	ofs << setprecision(10) << endl;
-
-	for (ii i = 0; i < n; ++i)
-	{
-		if (sum[i] > 0.0 || i > 0 && sum[i - 1] > 0.0 || i < n - 1 && sum[i + 1] > 0.0)
+		// sum up coefficients per group
+		vector<fp> gcs(ci1s.back() - ci0s.front() + 1, 0.0);
+		for (ii z = 0; z < cos.size() - 1; z++)
+		for (ii i = cos[z]; i < cos[z + 1]; i++)
 		{
-			ofs << i << "," << (cm.o[0] + i) * out_interval;
-			for (ii z = 0; z < max_z; z++) ofs << "," << cs[i*max_z + z];
-			ofs << endl;
+			gcs[i - cos[z] + ci0s[z] - ci0s.front()] += cs[j*cos.back() + i];
+		}
+
+		ofs << "mass,intensity" << setprecision(10) << endl;
+		for (ii i = 0; i < gcs.size(); ++i)
+		{
+			if (gcs[i] > 0.0 || i > 0 && gcs[i - 1] > 0.0 || i < gcs.size() - 1 && gcs[i + 1] > 0.0)
+			{
+				ofs << (ci0s.front() + i) * mass_interval << "," << gcs[i] << endl;
+			}
 		}
 	}
-
-	ofs << endl;
 }

@@ -28,7 +28,7 @@
 #include <iostream>
 
 
-struct CoeffsMetadata
+/*struct CoeffsMetadata
 {
 	CoeffsMetadata(ii d);
 	~CoeffsMetadata();
@@ -41,7 +41,7 @@ struct CoeffsMetadata
 	std::vector<ii> l; // coefficient dyadic level for each dimension
 	std::vector<ii> o; // coefficient offset
 	std::vector<ii> n; // number of coefficients per set
-};
+};*/
 
 
 class Basis
@@ -51,8 +51,7 @@ protected:
     Basis* parent;  // parent node
     ii child_count; // how many children synthesise to this node
     bool transient; // if transient, coefficients not part of fitting
-    
-    CoeffsMetadata cm;
+    //CoeffsMetadata cm;
   
     double volume; // statistic of the last error() call
     double discrep; // statistic of the last error() call
@@ -71,12 +70,11 @@ public:
     virtual void l2norm(std::vector<fp>& es, const std::vector<fp>& fs) = 0;
 	virtual void error(std::vector<fp>& fs, const std::vector<fp>& gs);
 	virtual void shrink(std::vector<fp>& es, const std::vector<fp>& cs, const std::vector<fp>& l2, const std::vector<fp>& wcs, double shrinkage);
+	virtual li get_nc() = 0;
 
     ii get_index() { return index; }
     Basis* get_parent() { return parent; }
     bool is_transient() { return transient; }
-    
-    const CoeffsMetadata& get_cm() { return cm; }
     
     // some statistics of the last error() call
     double get_volume() { return volume; }

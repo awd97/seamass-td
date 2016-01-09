@@ -20,71 +20,46 @@
 //
 
 
-#ifndef _SEAMASS_BASISCHARGEDISTRIBUTION_HPP_
-#define _SEAMASS_BASISCHARGEDISTRIBUTION_HPP_
+#ifndef _SEAMASS_TOPDOWN_BASISCHARGEDISTRIBUTION_HPP_
+#define _SEAMASS_TOPDOWN_BASISCHARGEDISTRIBUTION_HPP_
 
 
 #include "../core/Basis.hpp"
 #include "../core/BSpline.hpp"
 
 
-class BasisUniformChargeDistribution : public Basis
+class BasisChargeDistribution : public Basis
 {
 protected:
-    const std::vector<li>& is;
-    
-    // CSR sparse A basis matrices and their transposes
-    std::vector<ii> nnz;
-    std::vector<ii> m;
-    std::vector< std::vector<fp> > a;
-    std::vector< std::vector<ii> > ia, ja;
- 	
-	double rc; // resolution of output (in Daltons)
-    
-public:
-	BasisUniformChargeDistribution(std::vector<Basis*>& bases,
-                            const std::vector< std::vector<double> >& mzs,
-                            const std::vector<fp>& gs, const std::vector<li>& is, const std::vector<ii>& js,
-							ii mass_res, ii max_z, double max_peak_width,
-							bool transient = false);
-    
-	~BasisUniformChargeDistribution();
-    
-	void synthesis(std::vector<fp>& fs, const std::vector<fp>& cs, bool accum = true);
-	void analysis(std::vector<fp>& es, const std::vector<fp>& fs);
-	void l2norm(std::vector<fp>& es, const std::vector<fp>& fs);
-
-	void write_cs(const std::vector<fp>& cs);
-};
-
-
-class BasisFreeformChargeDistribution : public Basis
-{
-protected:
+	// Input (gs) data
 	const std::vector<li>& is;
 
-	// CSR sparse A basis matrices and their transposes
-	std::vector<ii> nnz;
-	std::vector<ii> m;
-	std::vector< std::vector<fp> > a;
-	std::vector< std::vector<ii> > ia, ja;
+	// Sparse basis matrices A (one per input spectrum)
+	std::vector<SparseMatrix> as;
 
-	double out_interval; // interval between output coefficients (in Daltons)
-	ii n, max_z;
+	// Output (cs) metadata
+	li nc;
+	std::vector<ii> ci0s, ci1s, cos; // coefficient range and offset for each charge state 
+	double mass_interval; // interval between output coefficients in Daltons
+
+	// Helpers
+	static double proton_mass; // mass of a proton (positive charge) in Daltons
+	static double peak_width(double fwhm, double mz); // orbitrap peak width given fwhm @ 400 m/z 
 
 public:
-	BasisFreeformChargeDistribution(std::vector<Basis*>& bases,
+	BasisChargeDistribution(std::vector<Basis*>& bases,
 		const std::vector< std::vector<double> >& mzs,
 		const std::vector<fp>& gs, const std::vector<li>& is, const std::vector<ii>& js,
-		ii out_res, ii max_z, double peak_fwhm,
+		double out_interval, ii out_res, ii factor_res, ii max_z, double peak_fwhm,
 		bool transient = false);
 
-	~BasisFreeformChargeDistribution();
+	~BasisChargeDistribution();
 
 	void synthesis(std::vector<fp>& fs, const std::vector<fp>& cs, bool accum = true);
 	void analysis(std::vector<fp>& es, const std::vector<fp>& fs);
 	void l2norm(std::vector<fp>& es, const std::vector<fp>& fs);
 	void shrink(std::vector<fp>& es, const std::vector<fp>& cs, const std::vector<fp>& l2, const std::vector<fp>& wcs, double shrinkage);
+	li get_nc() { return nc; }
 
 	void write_cs(const std::vector<fp>& cs);
 };

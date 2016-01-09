@@ -69,6 +69,9 @@ bool seamass_order(const spectrum& lhs, const spectrum& rhs)
 
 int main(int argc, char *argv[])
 {
+	cout << argv[0] << endl;
+
+
 	H5::Exception::dontPrint();
 	seamass::topdown_notice();
 	if (argc != 9)
