@@ -43,6 +43,7 @@ protected:
     std::vector< std::vector<fp> > q0s;
     
     ii iteration;
+	Info info;
 
 public:    
 	OptimiserASRL(const std::vector<Basis*>& _bases,
@@ -54,7 +55,8 @@ public:
 
     void threshold(double threshold);
 
-    std::vector< std::vector<fp> >& get_cs() { return cs; }
+    const std::vector< std::vector<fp> >& get_cs() const { return cs; }
+	const Info& get_info() const { return info; }
 };
 
 

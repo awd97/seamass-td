@@ -48,7 +48,7 @@ BasisChargeDistribution(vector<Basis*>& bases,
 						const vector<fp>& gs, const vector<li>& _is, const vector<ii>& js,
 						double _mass_interval, ii out_res, ii factor_res, ii max_z, double peak_fwhm,
 						bool transient) :
-	Basis(bases, 2, 0, transient),
+	Basis(bases, 0, transient),
 	is(_is),
 	as(js.size()),
 	ci0s(max_z, numeric_limits<ii>::max()),
@@ -56,7 +56,7 @@ BasisChargeDistribution(vector<Basis*>& bases,
 	cos(max_z+1),
 	mass_interval(_mass_interval / pow(2.0, (double)out_res))
 {
-	cout << index << " BasisChargeDistribution " << flush;
+	cout << get_index() << " BasisChargeDistribution " << flush;
 
 	///////////////////////////////////////////////////////////////////////
 	// create A as a temporary COO matrix
@@ -167,20 +167,19 @@ BasisChargeDistribution(vector<Basis*>& bases,
 				if (done % 1 == 0)
 				{
 					for (int i = 0; i < 256; ++i) cout << '\b';
-					cout << index << " BasisChargeDistribution " << setw(1 + (int)(log10((float)js.size()*max_z))) << done << "/" << js.size()*max_z << " " << flush;
+					cout << get_index() << " BasisChargeDistribution " << setw(1 + (int)(log10((float)js.size()*max_z))) << done << "/" << js.size()*max_z << " " << flush;
 				}
 			}
 		}
 
-		// create A
+		// create As
 		as[j].init(ms[j], cos[max_z], acoo, rowind, colind);
 	}
 	for (int i = 0; i < 256; ++i) cout << '\b';
 
-	cout << index << " BasisChargeDistribution";
+	cout << get_index() << " BasisChargeDistribution";
 	cout << " mass_range=[" << setprecision(2) << mass0 << ":" << setprecision(4) << mass_interval << ":" << setprecision(2) << mass1 << "]Da";
-	cout << " nc=" << nc;
-	if (transient) cout << " (t)";
+	if (transient) cout << " (t)" << endl; else cout << " nc=" << nc << endl;
 	for (ii j = 0; j < js.size(); j++)
 	{
 		cout << endl;
@@ -192,6 +191,7 @@ BasisChargeDistribution(vector<Basis*>& bases,
 	{
 		cout << endl << "  z=" << z+1 << " co=" << cos[z] << " ci_range=[" << ci0s[z] << ":" << ci1s[z] << "]" << flush;
 	}
+	cout << endl;
 }
 
 
@@ -202,7 +202,7 @@ BasisChargeDistribution::~BasisChargeDistribution()
 
 void
 BasisChargeDistribution::
-synthesis(vector<fp>& fs, const vector<fp>& cs, bool accum)
+synthesis(vector<fp>& fs, const vector<fp>& cs, bool accum) const
 {
 	for (li j = 0; j < as.size(); j++)
 	{
@@ -213,7 +213,7 @@ synthesis(vector<fp>& fs, const vector<fp>& cs, bool accum)
 
 void
 BasisChargeDistribution::
-analysis(vector<fp>& es, const vector<fp>& fs)
+analysis(vector<fp>& es, const vector<fp>& fs) const
 {
 	for (li j = 0; j < as.size(); j++)
 	{
@@ -224,7 +224,7 @@ analysis(vector<fp>& es, const vector<fp>& fs)
 
 void
 BasisChargeDistribution::
-l2norm(vector<fp>& es, const vector<fp>& fs)
+l2norm(vector<fp>& es, const vector<fp>& fs) const
 {
 	for (li j = 0; j < as.size(); j++)
 	{
@@ -235,7 +235,7 @@ l2norm(vector<fp>& es, const vector<fp>& fs)
 
 void
 BasisChargeDistribution::
-shrink(std::vector<fp>& es, const std::vector<fp>& cs, const std::vector<fp>& l2, const std::vector<fp>& wcs, double shrinkage)
+shrink(std::vector<fp>& es, const std::vector<fp>& cs, const std::vector<fp>& l2, const std::vector<fp>& wcs, double shrinkage) const
 {
 	// GROUP-WISE SHRINKAGE! (note - intuitive implemention, not mathematically verified yet)
 	// also horrible gather operation
@@ -273,7 +273,7 @@ shrink(std::vector<fp>& es, const std::vector<fp>& cs, const std::vector<fp>& l2
 
 void
 BasisChargeDistribution::
-write_cs(const std::vector<fp>& cs)
+write_cs(const std::vector<fp>& cs) const
 {
 	for (li j = 0; j < as.size(); j++)
 	{

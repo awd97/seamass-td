@@ -38,7 +38,7 @@ protected:
 	std::vector<SparseMatrix> as;
 
 	// Output (cs) metadata
-	li nc;
+	li nc; // number of coefficients across all spectra
 	std::vector<ii> ci0s, ci1s, cos; // coefficient range and offset for each charge state 
 	double mass_interval; // interval between output coefficients in Daltons
 
@@ -55,13 +55,18 @@ public:
 
 	~BasisChargeDistribution();
 
-	void synthesis(std::vector<fp>& fs, const std::vector<fp>& cs, bool accum = true);
-	void analysis(std::vector<fp>& es, const std::vector<fp>& fs);
-	void l2norm(std::vector<fp>& es, const std::vector<fp>& fs);
-	void shrink(std::vector<fp>& es, const std::vector<fp>& cs, const std::vector<fp>& l2, const std::vector<fp>& wcs, double shrinkage);
-	li get_nc() { return nc; }
+	void synthesis(std::vector<fp>& fs, const std::vector<fp>& cs, bool accum = true) const;
+	void analysis(std::vector<fp>& es, const std::vector<fp>& fs) const;
+	void l2norm(std::vector<fp>& es, const std::vector<fp>& fs) const;
+	void shrink(std::vector<fp>& es, const std::vector<fp>& cs, const std::vector<fp>& l2, const std::vector<fp>& wcs, double shrinkage) const;
+	li get_nc() const { return nc; }
 
-	void write_cs(const std::vector<fp>& cs);
+	const std::vector<ii>& get_ci0s() const { return ci0s; }
+	const std::vector<ii>& get_ci1s() const { return ci1s; }
+	const std::vector<ii>& get_cos() const { return cos; }
+	ii get_ns() const { return as.size(); }
+
+	void write_cs(const std::vector<fp>& cs) const;
 };
 
 

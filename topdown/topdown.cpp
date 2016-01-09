@@ -79,11 +79,11 @@ namespace seamass
 		ii order = 3; // B-spline order
 
 		// Construct BasisChargeDistribution, which gets added as the root node of bases
-		BasisChargeDistribution bChargeDistribution(bases, mzs, gs, is, js, 1.00286084990559, out_res, 0, max_z, max_peak_width, false);
+		BasisChargeDistribution bChargeDistribution(bases, mzs, gs, is, js, 1.00286084990559, out_res, 0, max_z, max_peak_width, true);
 		for (ii j = 0; j < (ii)mzs.size(); j++) vector<double>().swap(mzs[j]);
 
 		// Construct BasisIsotopeDistribution, which gets added to bases with bChargeDistribution as parent
-		//BasisIsotopeDistribution bIsotopeDistribution(bases, &bChargeDistribution, out_res, 0, max_z);
+		BasisIsotopeDistribution bIsotopeDistribution(bases, &bChargeDistribution, out_res, 0, max_z);
 
 		////////////////////////////////////////////////////////////////////////////////////
 		// OPTIMISATION
@@ -116,10 +116,10 @@ namespace seamass
 			}
 
 			cout << "  f: " << fixed << setw(5) << i;
-			cout << "  err: " << setw(8) << setprecision(5) << bases.front()->get_error();
-			cout << "  max: " << setw(8) << setprecision(1) << bases.front()->get_maxerror();
-			cout << "  dis: " << setw(8) << setprecision(5) << bases.front()->get_discrep();
-			cout << "  vol: " << setw(8) << setprecision(5) << bases.front()->get_volume();
+			cout << "  err: " << setw(8) << setprecision(5) << optimiser.get_info().error;
+			cout << "  max: " << setw(8) << setprecision(1) << optimiser.get_info().max_error;
+			cout << "  dis: " << setw(8) << setprecision(5) << optimiser.get_info().discrep;
+			cout << "  vol: " << setw(8) << setprecision(5) << optimiser.get_info().volume;
 			cout << "  nnz: " << setw(8) << setprecision(5) << nnz;
 			cout << "  grad: " << setiosflags(ios::fixed) << setprecision(6) << setw(8) << grad << endl;
 		}
@@ -143,17 +143,17 @@ namespace seamass
 			}
 
 			cout << "  f: " << fixed << setw(5) << i;
-			cout << "  err: " << setw(8) << setprecision(5) << bases.front()->get_error();
-			cout << "  max: " << setw(8) << setprecision(1) << bases.front()->get_maxerror();
-			cout << "  dis: " << setw(8) << setprecision(5) << bases.front()->get_discrep();
-			cout << "  vol: " << setw(8) << setprecision(5) << bases.front()->get_volume();
+			cout << "  err: " << setw(8) << setprecision(5) << optimiser.get_info().error;
+			cout << "  max: " << setw(8) << setprecision(1) << optimiser.get_info().max_error;
+			cout << "  dis: " << setw(8) << setprecision(5) << optimiser.get_info().discrep;
+			cout << "  vol: " << setw(8) << setprecision(5) << optimiser.get_info().volume;
 			cout << "  nnz: " << setw(8) << setprecision(5) << nnz;
 			cout << "  grad: " << setiosflags(ios::fixed) << setprecision(6) << setw(8) << grad << endl;
 		}
 
 		//////////////////////////////////////////////////////////////////////////////////
 		// OUTPUT
-		bChargeDistribution.write_cs(optimiser.get_cs()[bChargeDistribution.get_index()]);
+		bChargeDistribution.write_cs(optimiser.get_cs()[bIsotopeDistribution.get_index()]);
 
 		////////////////////////////////////////////////////////////////////////////////////
 		omp_set_num_threads(_threads);

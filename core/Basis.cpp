@@ -90,12 +90,9 @@ print(ostream& out) const
 
 
 Basis::
-Basis(vector<Basis*>& bases, ii dimensions, Basis* _parent, bool _transient) :
+Basis(vector<Basis*>& bases, Basis* _parent, bool _transient) :
     parent(_parent),
-    transient(_transient),
-    //cm(dimensions),
-    volume(0.0),
-    discrep(0.0)
+    transient(_transient)
 {
     index = bases.size();
     bases.push_back(this);
@@ -103,20 +100,22 @@ Basis(vector<Basis*>& bases, ii dimensions, Basis* _parent, bool _transient) :
 }
 
 
-void
+Info
 Basis::
-error(vector<fp>& fs, const vector<fp>& gs)
+error(vector<fp>& fs, const vector<fp>& gs) const
 {
+	Info info;
+
     ii size_d = 0;
     double dis = 0.0;
     double err = 0.0;
     double sum_g = 0.0;
     double sum_f = 0.0;
-    maxerr = 0;
+    info.max_error = 0;
     for (li i = 0; i < gs.size(); i++)
     {
         double v = fabs(gs[i]-fs[i]);
-        maxerr = maxerr > v ? maxerr : v;
+        info.max_error = info.max_error > v ? info.max_error : v;
     }
     // bug in this openmp section at present for err and discrep
     //#pragma omp parallel for simd reduction(+:dis,err,size_d,sum_g,sum_f)
@@ -138,16 +137,19 @@ error(vector<fp>& fs, const vector<fp>& gs)
             fs[i] = 1.0;
         }
     }
-    volume = sum_f / sum_g;
-    discrep = dis / size_d;
-    erro = err / size_d;
+    info.volume = sum_f / sum_g;
+    info.discrep = dis / size_d;
+    info.error = err / size_d;
+
+	return info;
 }
 
 
 void
 Basis::
-shrink(std::vector<fp>& es, const std::vector<fp>& cs, const std::vector<fp>& l2, const std::vector<fp>& wcs, double shrinkage)
+shrink(std::vector<fp>& es, const std::vector<fp>& cs, const std::vector<fp>& l2, const std::vector<fp>& wcs, double shrinkage) const
 {
+	// Standard shrinkage
 	#pragma omp parallel for
 	for (li i = 0; i < es.size(); i++)
 	if (es[i] >= FLT_MIN && cs[i] >= FLT_MIN)

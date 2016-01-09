@@ -24,29 +24,34 @@
 #define _SEAMASS_BASISISOTOPEDISTRIBUTION_HPP_
 
 
-#include "../core/Basis.hpp"
 #include "../core/BSpline.hpp"
+#include "BasisChargeDistribution.hpp"
 
 
 class BasisIsotopeDistribution : public Basis
 {
-protected:
-	// CSR sparse A basis matrix
-	ii m, nnz;
-	std::vector<fp> a;
-	std::vector<ii> ia, ja;
+private:
+	// Input
+	//BasisChargeDistribution* parent;
+
+	// Sparse basis matrix A (same for each input spectrum)
+	SparseMatrix a;
+
+	// Output (cs) metadata
+	li ns, nc; // number of spectra and number of coefficients across all spectra
 
 public:
-	BasisIsotopeDistribution(std::vector<Basis*>& bases, Basis* parent,
+	BasisIsotopeDistribution(std::vector<Basis*>& bases, BasisChargeDistribution* parent,
 		                     ii out_res, ii factor_res, ii max_z,
 							 bool transient = false);
 
 	~BasisIsotopeDistribution();
 
-	void synthesis(std::vector<fp>& fs, const std::vector<fp>& cs, bool accum = true);
-	void analysis(std::vector<fp>& es, const std::vector<fp>& fs);
-	void l2norm(std::vector<fp>& es, const std::vector<fp>& fs);
-	void shrink(std::vector<fp>& es, const std::vector<fp>& cs, const std::vector<fp>& l2, const std::vector<fp>& wcs, double shrinkage);
+	void synthesis(std::vector<fp>& fs, const std::vector<fp>& cs, bool accum = true) const;
+	void analysis(std::vector<fp>& es, const std::vector<fp>& fs) const;
+	void l2norm(std::vector<fp>& es, const std::vector<fp>& fs) const;
+	void shrink(std::vector<fp>& es, const std::vector<fp>& cs, const std::vector<fp>& l2, const std::vector<fp>& wcs, double shrinkage) const;
+	li get_nc() const { return nc; }
 };
 
 

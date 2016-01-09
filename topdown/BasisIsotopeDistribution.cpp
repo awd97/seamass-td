@@ -31,30 +31,30 @@ using namespace std;
 
 
 BasisIsotopeDistribution::
-BasisIsotopeDistribution(vector<Basis*>& bases, Basis* parent,
-                         ii out_res, ii factor_res, ii max_z,
-                         bool transient) :
-	Basis(bases, parent->get_cm().d, parent, transient)
+BasisIsotopeDistribution(vector<Basis*>& bases, BasisChargeDistribution* parent,
+	                     ii out_res, ii factor_res, ii max_z, bool transient) :
+	Basis(bases, parent, transient),
+	ns(parent->get_ns()),
+	nc(parent->get_nc())
 {
-	cout << index << " BasisIsotopeDistribution " << flush;
+	cout << get_index() << " BasisIsotopeDistribution " << flush;
 
 	ifstream ifs("seamass-td.factors");
-	//ofstream ofs("grr");
+	//ofstream ofs("grr2");
 	multimap< ii, vector<fp> > factors;
-	ii i0 = parent->get_cm().o[0] / (1 << (out_res - factor_res));
-	ii i1 = (parent->get_cm().o[0] + parent->get_cm().n[0] / max_z) / (1 << (out_res - factor_res));
-	//cout << "i:[" << i0 << "," << i1 << "]" << endl;
+	ii ci0 = parent->get_ci0s().front() / (1 << (out_res - factor_res));
+	ii ci1 = parent->get_ci1s().back() / (1 << (out_res - factor_res));
 
 	while (ifs.good())
 	{
 		char comma;
-		ii i, z, id;
-		ifs >> i;
-		if (i < i0) { ifs.ignore(65535, '\n'); continue; }
-		if (i > i1) break;
-		
+		ii ci, z, id;
+		ifs >> ci;
+		if (ci < ci0) { ifs.ignore(65535, '\n'); continue; }
+		if (ci > ci1) break;
+
 		ifs >> comma >> z >> comma >> id;
-		map< ii, vector<fp> >::iterator elem = factors.insert(pair< ii, vector<fp> >(i, vector<fp>()));
+		map< ii, vector<fp> >::iterator elem = factors.insert(pair< ii, vector<fp> >(ci, vector<fp>()));
 		for (ii j = 0; j < 21; j++)
 		{
 			fp isotope;
@@ -68,65 +68,85 @@ BasisIsotopeDistribution(vector<Basis*>& bases, Basis* parent,
 			{
 				elem->second.push_back(isotope);
 			}
-			//cout << " " << isotope << endl;
 		}
-		//ofs << i << " " << z << " " << id << " " << elem->second.size() << endl;
+		//ofs << ci << " " << z << " " << id << " " << elem->second.size() << endl;
 
-		if (i % 10000 == 0)
+		if ((ci-ci0) % 1000 == 0)
 		{
 			for (int i = 0; i < 256; ++i) cout << '\b';
-			cout << index << " BasisIsotopeDistribution " << setw(1 + (int)(log10((float)i1))) << i0 << "/" << i << "/" << i1 << " " << flush;
+			cout << get_index() << " BasisIsotopeDistribution " << setw(1 + (int)(log10((float)ci1))) << ci-ci0 << "/" << ci1-ci0 << " " << flush;
 		}
 	}
 	for (int i = 0; i < 256; ++i) cout << '\b';
-	cout << index << " BasisIsotopeDistribution " << flush;
-
 
 	///////////////////////////////////////////////////////////////////////
 	// create A as a temporary COO matrix
 
-	cm = get_parent()->get_cm();
+	ii nnz = 0;
+	for (ii z = 0; z < parent->get_cos().size() - 1; z++)
+	for (ii i = parent->get_cos()[z]; i < parent->get_cos()[z + 1]; i++)
+	{
+		ii ci = i - parent->get_cos()[z] + parent->get_ci0s()[z];
+		ii fi = ci / (1 << (out_res - factor_res));
+		
+		bool yes = true;
+		for (pair<multimap< ii, vector<fp> >::iterator, multimap< ii, vector<fp> >::iterator> fs = factors.equal_range(fi); fs.first != fs.second; ++fs.first)
+		{
+			//if (yes) ofs << "z=" << z << " ci=" << ci << " fi=" << fi << endl;
+			//yes = false;
+			for (ii j = 0; j < fs.first->second.size(); j++)
+			{
+				ii oi = i + j * (1 << out_res);
+				if (oi < parent->get_cos()[z + 1])
+				{
+					nnz++;
+					//ofs << " " << fs.first->second[i];
+				}
+			}
+			break;
+			//ofs << endl;
+		}
+		//cs[j*cos.back() + i];
+	}
 
-	m = parent->get_cm().n[0];
-
-	nnz = m;
+	cout << endl << "nnz=" << nnz << endl << endl;;
 	vector<fp> acoo(nnz);
 	vector<ii> rowind(nnz);
 	vector<ii> colind(nnz);
 
 	ii k = 0;
-	for (ii j = 0; j < cm.n[1]; j++)
-	for (ii i = 0; i < cm.n[0]; i++)
+	for (ii z = 0; z < parent->get_cos().size() - 1; z++)
+	for (ii i = parent->get_cos()[z]; i < parent->get_cos()[z + 1]; i++)
 	{
-		//ii f = (get_cm().o[0] + i) / (1 << (out_res - factor_res));
-		//find->
+		ii ci = i - parent->get_cos()[z] + parent->get_ci0s()[z];
+		ii fi = ci / (1 << (out_res - factor_res));
 
-		//for (ii z = 0; z < max_z; z++)
+		for (pair<multimap< ii, vector<fp> >::iterator, multimap< ii, vector<fp> >::iterator> fs = factors.equal_range(fi); fs.first != fs.second; ++fs.first)
 		{
-			acoo[k] = 1.0;
-			rowind[k] = k;
-			colind[k] = k;
-			k++;
+			for (ii j = 0; j < fs.first->second.size(); j++)
+			{
+				ii oi = i + j * (1 << out_res);
+				if (oi < parent->get_cos()[z + 1])
+				{
+					acoo[k] = fs.first->second[j];
+					rowind[k] = oi;
+					colind[k] = i;
+					k++;
+				}
+			}
+			break;
 		}
 	}
 
-	a.resize(nnz);
-	ia.resize(m + 1);
-	ja.resize(nnz);
+	// create A
+	a.init(parent->get_cos().back(), parent->get_cos().back(), acoo, rowind, colind);
 
-	ii job[] = { 2, 0, 0, 0, nnz, 0 }; ii info;
-	mkl_scsrcoo(job, &m, a.data(), ja.data(), ia.data(), &nnz, acoo.data(), rowind.data(), colind.data(), &info);
+	cout << "HELLO" << endl;
 
-	cout << index << " BasisIsotopeDistribution ";
-	cm.print(cout);
-	li size = sizeof(this);
-	size += sizeof(fp) * a.capacity();
-	size += sizeof(ii) * ia.capacity();
-	size +=  sizeof(ii) * ja.capacity();
-	cout << " mem=" << setprecision(2) << fixed << size / (1024.0*1024.0) << "Mb";
-	if (transient) cout << " (t)";
-	cout << endl;
-	cout << "    A=[" << m << "," << cm.n[0] << "]:" << nnz << endl;
+	cout << get_index() << " BasisIsotopeDistribution ";
+	cout << " A=";
+	a.print(cout);	
+	if (transient) cout << " (t)" << endl; else cout << " nc=" << nc << endl;
 }
 
 
@@ -137,49 +157,40 @@ BasisIsotopeDistribution::~BasisIsotopeDistribution()
 
 void
 BasisIsotopeDistribution::
-synthesis(vector<fp>& fs, const vector<fp>& cs, bool accum)
+synthesis(vector<fp>& fs, const vector<fp>& cs, bool accum) const
 {
-	static fp alpha = 1.0;
-	fp beta = accum ? 1.0 : 0.0;
-	for (li j = 0; j < cm.n[1]; j++)
+	for (li j = 0; j < ns; j++)
 	{
-		fp* c = const_cast<fp*>(&(cs.data()[j*cm.n[0]]));
-		mkl_scsrmv("N", &m, &(cm.n[0]), &alpha, "G**C", a.data(), ja.data(), ia.data(), &(ia.data()[1]), c, &beta, &(fs.data()[j*cm.n[0]]));
+		a.mult(&(fs.data()[j*a.get_m()]), &(cs.data()[j*a.get_n()]), false, accum);
 	}
 }
 
 
 void
 BasisIsotopeDistribution::
-analysis(vector<fp>& es, const vector<fp>& fs)
+analysis(vector<fp>& es, const vector<fp>& fs) const
 {
-	static fp alpha = 1.0, beta = 0.0;
-	for (li j = 0; j < cm.n[1]; j++)
+	for (li j = 0; j < ns; j++)
 	{
-		fp* f = const_cast<fp*>(&(fs.data()[j*cm.n[0]]));
-		mkl_scsrmv("T", &m, &(cm.n[0]), &alpha, "G**C", a.data(), ja.data(), ia.data(), &(ia.data()[1]), f, &beta, &(es.data()[j*cm.n[0]]));
+		a.mult(&(es.data()[j*a.get_n()]), &(fs.data()[j*a.get_m()]), true);
 	}
 }
 
 
 void
 BasisIsotopeDistribution::
-l2norm(vector<fp>& es, const vector<fp>& fs)
+l2norm(vector<fp>& es, const vector<fp>& fs) const
 {
-	static fp alpha = 1.0, beta = 0.0;
-	for (li j = 0; j < cm.n[1]; j++)
+	for (li j = 0; j < ns; j++)
 	{
-		vector<fp> a2(nnz);
-		vsSqr(nnz, a.data(), a2.data());
-		fp* f = const_cast<fp*>(&(fs.data()[j*cm.n[0]]));
-		mkl_scsrmv("T", &m, &(cm.n[0]), &alpha, "G**C", a2.data(), ja.data(), ia.data(), &(ia.data()[1]), f, &beta, &(es.data()[j*cm.n[0]]));
+		a.sqr_mult(&(es.data()[j*a.get_n()]), &(fs.data()[j*a.get_m()]), true);
 	}
 }
 
 
 void
 BasisIsotopeDistribution::
-shrink(std::vector<fp>& es, const std::vector<fp>& cs, const std::vector<fp>& l2, const std::vector<fp>& wcs, double shrinkage)
+shrink(std::vector<fp>& es, const std::vector<fp>& cs, const std::vector<fp>& l2, const std::vector<fp>& wcs, double shrinkage) const
 {
-	parent->shrink(es, cs, l2, wcs, shrinkage);
+	get_parent()->shrink(es, cs, l2, wcs, shrinkage);
 }

@@ -165,14 +165,12 @@ threshold(double thresh)
         if (cs[j][i] < thresh) cs[j][i] = 0.0;
     }
     
-    double volume = bases.front()->get_volume();
-    
     for (ii j = 0; j < (ii) bases.size(); j++)
     if (!bases[j]->is_transient())
     #pragma omp parallel for
     for (li i = 0; i < (li) bases[j]->get_nc(); i++)
     {
-        cs[j][i] /= volume;
+        cs[j][i] /= info.volume;
     }
 }
 
@@ -227,7 +225,7 @@ step(ii iteration, double shrinkage)
     
     double error_start = omp_get_wtime();
     // Poisson likelihood error
-    bases.front()->error(fs, gs);
+    info = bases.front()->error(fs, gs);
     // timing
     double error_duration = omp_get_wtime() - error_start;
     static double culm_error_duration = 0.0;

@@ -8,8 +8,8 @@ add_library(seamass_topdown
   topdown.cpp
   BasisChargeDistribution.hpp
   BasisChargeDistribution.cpp
-  #BasisIsotopeDistribution.hpp
-  #BasisIsotopeDistribution.cpp
+  BasisIsotopeDistribution.hpp
+  BasisIsotopeDistribution.cpp
 )
 
 #include(GenerateExportHeader)

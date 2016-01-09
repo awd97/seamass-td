@@ -28,59 +28,39 @@
 #include <iostream>
 
 
-/*struct CoeffsMetadata
+struct Info
 {
-	CoeffsMetadata(ii d);
-	~CoeffsMetadata();
-
-	li size() const;
-	void print(std::ostream& out) const;
-	void operator=(const CoeffsMetadata& cm);
-
-	ii d;        // dimension of the output coefficients
-	std::vector<ii> l; // coefficient dyadic level for each dimension
-	std::vector<ii> o; // coefficient offset
-	std::vector<ii> n; // number of coefficients per set
-};*/
+	double volume;
+	double discrep;
+	double error;
+	double max_error;
+};
 
 
 class Basis
 {
-protected:
+private:
     ii index;       // index of this basis in the serialised tree
     Basis* parent;  // parent node
     ii child_count; // how many children synthesise to this node
     bool transient; // if transient, coefficients not part of fitting
-    //CoeffsMetadata cm;
-  
-    double volume; // statistic of the last error() call
-    double discrep; // statistic of the last error() call
-    double erro; // statistic of the last error() call
-    double maxerr; // statistic of the last error() call
 
 public:
 	Basis(std::vector<Basis*>& bases,
-          ii dimensions,
           Basis* parent = NULL, bool
           transient = false);
     virtual ~Basis() {}
     
-    virtual void synthesis(std::vector<fp>& fs, const std::vector<fp>& cs, bool accum = true) = 0;
-    virtual void analysis(std::vector<fp>& es, const std::vector<fp>& fs) = 0;
-    virtual void l2norm(std::vector<fp>& es, const std::vector<fp>& fs) = 0;
-	virtual void error(std::vector<fp>& fs, const std::vector<fp>& gs);
-	virtual void shrink(std::vector<fp>& es, const std::vector<fp>& cs, const std::vector<fp>& l2, const std::vector<fp>& wcs, double shrinkage);
-	virtual li get_nc() = 0;
+    virtual void synthesis(std::vector<fp>& fs, const std::vector<fp>& cs, bool accum = true) const = 0;
+	virtual void analysis(std::vector<fp>& es, const std::vector<fp>& fs) const = 0;
+	virtual void l2norm(std::vector<fp>& es, const std::vector<fp>& fs) const = 0;
+	virtual Info error(std::vector<fp>& fs, const std::vector<fp>& gs) const;
+	virtual void shrink(std::vector<fp>& es, const std::vector<fp>& cs, const std::vector<fp>& l2, const std::vector<fp>& wcs, double shrinkage) const;
+	virtual li get_nc() const = 0;
 
-    ii get_index() { return index; }
-    Basis* get_parent() { return parent; }
-    bool is_transient() { return transient; }
-    
-    // some statistics of the last error() call
-    double get_volume() { return volume; }
-    double get_discrep() { return discrep; }
-    double get_error() { return erro; }
-    double get_maxerror() { return maxerr; }
+    ii get_index() const { return index; }
+    Basis* get_parent() const { return parent; }
+    bool is_transient() const { return transient; }
 };
 
 
