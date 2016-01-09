@@ -65,6 +65,7 @@ public:
 	const std::vector<ii>& get_ci1s() const { return ci1s; }
 	const std::vector<ii>& get_cos() const { return cos; }
 	ii get_ns() const { return as.size(); }
+	double get_mass_interval() const { return mass_interval; }
 
 	void write_cs(const std::vector<fp>& cs) const;
 };

@@ -24,128 +24,164 @@
 #include <limits>
 #include <map>
 #include <fstream>
+#include <sstream>
 #include <iomanip>
 #include <cmath>
 #include <cfloat>
 using namespace std;
 
 
+struct Factor
+{
+	ii gi;
+	vector<fp> p;
+
+	Factor(ii _gi) : gi(_gi) {}
+};
+
+
 BasisIsotopeDistribution::
-BasisIsotopeDistribution(vector<Basis*>& bases, BasisChargeDistribution* parent,
+BasisIsotopeDistribution(vector<Basis*>& bases, BasisChargeDistribution* _parent,
 	                     ii out_res, ii factor_res, ii max_z, bool transient) :
-	Basis(bases, parent, transient),
+	Basis(bases, _parent, transient),
+	parent(_parent),
 	ns(parent->get_ns()),
 	nc(parent->get_nc())
 {
 	cout << get_index() << " BasisIsotopeDistribution " << flush;
 
+	///////////////////////////////////////////////////////////////////////
+	// load learnt factors into multimap
+
 	ifstream ifs("seamass-td.factors");
-	//ofstream ofs("grr2");
-	multimap< ii, vector<fp> > factors;
-	ii ci0 = parent->get_ci0s().front() / (1 << (out_res - factor_res));
-	ii ci1 = parent->get_ci1s().back() / (1 << (out_res - factor_res));
+	multimap<ii, Factor>* factors = new multimap<ii, Factor>;
+	ii fi0 = parent->get_ci0s().front() / (1 << (out_res - factor_res));
+	ii fi1 = parent->get_ci1s().back() / (1 << (out_res - factor_res));
 
 	while (ifs.good())
 	{
 		char comma;
-		ii ci, z, id;
-		ifs >> ci;
-		if (ci < ci0) { ifs.ignore(65535, '\n'); continue; }
-		if (ci > ci1) break;
+		ii fi, z, fgi;
+		ifs >> fi;
+		if (fi < fi0) { ifs.ignore(65535, '\n'); continue; }
+		if (fi > fi1) break;
 
-		ifs >> comma >> z >> comma >> id;
-		map< ii, vector<fp> >::iterator elem = factors.insert(pair< ii, vector<fp> >(ci, vector<fp>()));
+		ifs >> comma >> z >> comma >> fgi;
+		map<ii,Factor>::iterator elem = factors->insert(pair<ii,Factor>(fi, Factor(fgi)));
 		for (ii j = 0; j < 21; j++)
 		{
 			fp isotope;
 			ifs >> comma >> isotope;
-			if (elem->second.size() > 0 && isotope <= elem->second.back() && isotope < 0.00001)
+			if (elem->second.p.size() > 0 && isotope <= elem->second.p.back() && isotope < 0.00001)
 			{
 				ifs.ignore(65535, '\n');
 				break;
 			}
 			else
 			{
-				elem->second.push_back(isotope);
+				elem->second.p.push_back(isotope);
 			}
 		}
 		//ofs << ci << " " << z << " " << id << " " << elem->second.size() << endl;
 
-		if ((ci-ci0) % 1000 == 0)
+		if ((fi-fi0) % 1000 == 0)
 		{
 			for (int i = 0; i < 256; ++i) cout << '\b';
-			cout << get_index() << " BasisIsotopeDistribution " << setw(1 + (int)(log10((float)ci1))) << ci-ci0 << "/" << ci1-ci0 << " " << flush;
+			cout << get_index() << " BasisIsotopeDistribution " << setw(1 + (int)(log10((float)fi1))) << fi-fi0 << "/" << fi1-fi0 << " " << flush;
 		}
 	}
 	for (int i = 0; i < 256; ++i) cout << '\b';
+	ifs.close();
 
 	///////////////////////////////////////////////////////////////////////
 	// create A as a temporary COO matrix
 
+	ii ng = 0;
 	ii nnz = 0;
-	for (ii z = 0; z < parent->get_cos().size() - 1; z++)
-	for (ii i = parent->get_cos()[z]; i < parent->get_cos()[z + 1]; i++)
+	for (ii oi = parent->get_ci0s().front(); oi <= parent->get_ci1s().back(); oi++)
 	{
-		ii ci = i - parent->get_cos()[z] + parent->get_ci0s()[z];
-		ii fi = ci / (1 << (out_res - factor_res));
-		
-		bool yes = true;
-		for (pair<multimap< ii, vector<fp> >::iterator, multimap< ii, vector<fp> >::iterator> fs = factors.equal_range(fi); fs.first != fs.second; ++fs.first)
+		ii fi = oi / (1 << (out_res - factor_res));
+		ii last_fgi = -1;
+		for (pair<multimap<ii, Factor>::iterator, multimap<ii, Factor>::iterator> fs = factors->equal_range(fi); fs.first != fs.second; ++fs.first)
 		{
-			//if (yes) ofs << "z=" << z << " ci=" << ci << " fi=" << fi << endl;
-			//yes = false;
-			for (ii j = 0; j < fs.first->second.size(); j++)
+			ii fgi = fs.second->first;
+			if (fgi != last_fgi)
 			{
-				ii oi = i + j * (1 << out_res);
-				if (oi < parent->get_cos()[z + 1])
+				ng++;
+				last_fgi = fgi;
+			}
+
+			Factor& fac = fs.second->second;
+			for (ii z = 0; z < parent->get_ci0s().size(); z++)
+			if (oi >= parent->get_ci0s()[z] && oi <= parent->get_ci1s()[z])
+			{
+				for (ii i = 0; i < fs.first->second.p.size(); i++)
 				{
-					nnz++;
-					//ofs << " " << fs.first->second[i];
+					ii pi = oi + i * (1 << out_res);
+					if (pi <= parent->get_ci1s()[z])
+					{
+						nnz++;
+					}
 				}
 			}
-			break;
-			//ofs << endl;
 		}
-		//cs[j*cos.back() + i];
 	}
 
-	cout << endl << "nnz=" << nnz << endl << endl;;
 	vector<fp> acoo(nnz);
 	vector<ii> rowind(nnz);
 	vector<ii> colind(nnz);
+	gis.resize(ng+1);
+	gis[0] = 0;
+	ois.resize(parent->get_ci1s().back() - parent->get_ci0s().front() + 1);
+	ois[0] = 0;
 
+	ii ci = 0;
+	ii gi = 0;
 	ii k = 0;
-	for (ii z = 0; z < parent->get_cos().size() - 1; z++)
-	for (ii i = parent->get_cos()[z]; i < parent->get_cos()[z + 1]; i++)
+	for (ii oi = parent->get_ci0s().front(); oi <= parent->get_ci1s().back(); oi++)
 	{
-		ii ci = i - parent->get_cos()[z] + parent->get_ci0s()[z];
-		ii fi = ci / (1 << (out_res - factor_res));
-
-		for (pair<multimap< ii, vector<fp> >::iterator, multimap< ii, vector<fp> >::iterator> fs = factors.equal_range(fi); fs.first != fs.second; ++fs.first)
+		ii fi = oi / (1 << (out_res - factor_res));
+		ii last_fgi = -1;
+		for (pair<multimap<ii, Factor>::iterator, multimap<ii, Factor>::iterator> fs = factors->equal_range(fi); fs.first != fs.second; ++fs.first)
 		{
-			for (ii j = 0; j < fs.first->second.size(); j++)
+			ii fgi = fs.second->first;
+			if (fgi != last_fgi)
 			{
-				ii oi = i + j * (1 << out_res);
-				if (oi < parent->get_cos()[z + 1])
-				{
-					acoo[k] = fs.first->second[j];
-					rowind[k] = oi;
-					colind[k] = i;
-					k++;
-				}
+				gi++;
+				gis[gi] = ci;
+				last_fgi = fgi;
 			}
-			break;
+
+			Factor& fac = fs.second->second;
+			for (ii z = 0; z < parent->get_ci0s().size(); z++)
+			if (oi >= parent->get_ci0s()[z] && oi <= parent->get_ci1s()[z])
+			{
+				for (ii i = 0; i < fs.first->second.p.size(); i++)
+				{
+					ii pi = oi + i * (1 << out_res);
+					if (pi <= parent->get_ci1s()[z])
+					{
+						acoo[k] = fs.first->second.p[i];
+						rowind[k] = pi - parent->get_ci0s()[z] + parent->get_cos()[z];
+						colind[k] = ci;
+						k++;
+					}
+				}
+				ci++;
+			}
 		}
+		ois[oi - parent->get_ci0s().front() + 1] = ci;
 	}
+	nc = ns * ci;
 
 	// create A
-	a.init(parent->get_cos().back(), parent->get_cos().back(), acoo, rowind, colind);
-
-	cout << "HELLO" << endl;
+	delete factors;
+	a.init(parent->get_cos().back(), nc / ns, acoo, rowind, colind);
 
 	cout << get_index() << " BasisIsotopeDistribution ";
 	cout << " A=";
-	a.print(cout);	
+	a.print(cout);
+	cout << " ng=" << ng;
 	if (transient) cout << " (t)" << endl; else cout << " nc=" << nc << endl;
 }
 
@@ -159,7 +195,7 @@ void
 BasisIsotopeDistribution::
 synthesis(vector<fp>& fs, const vector<fp>& cs, bool accum) const
 {
-	for (li j = 0; j < ns; j++)
+	for (ii j = 0; j < ns; j++)
 	{
 		a.mult(&(fs.data()[j*a.get_m()]), &(cs.data()[j*a.get_n()]), false, accum);
 	}
@@ -170,7 +206,7 @@ void
 BasisIsotopeDistribution::
 analysis(vector<fp>& es, const vector<fp>& fs) const
 {
-	for (li j = 0; j < ns; j++)
+	for (ii j = 0; j < ns; j++)
 	{
 		a.mult(&(es.data()[j*a.get_n()]), &(fs.data()[j*a.get_m()]), true);
 	}
@@ -181,7 +217,7 @@ void
 BasisIsotopeDistribution::
 l2norm(vector<fp>& es, const vector<fp>& fs) const
 {
-	for (li j = 0; j < ns; j++)
+	for (ii j = 0; j < ns; j++)
 	{
 		a.sqr_mult(&(es.data()[j*a.get_n()]), &(fs.data()[j*a.get_m()]), true);
 	}
@@ -192,5 +228,50 @@ void
 BasisIsotopeDistribution::
 shrink(std::vector<fp>& es, const std::vector<fp>& cs, const std::vector<fp>& l2, const std::vector<fp>& wcs, double shrinkage) const
 {
-	get_parent()->shrink(es, cs, l2, wcs, shrinkage);
+	// GROUP-WISE SHRINKAGE! (note - intuitive implemention, not mathematically verified yet)
+	ii n = nc / ns;
+	for (ii j = 0; j < ns; j++)
+	{
+		#pragma omp parallel for
+		for (ii g = 0; g < gis.size() - 1; g++)
+		{
+			// sum up coefficients per group
+			fp sum = 0.0;
+			for (ii i = gis[g]; i < gis[g + 1]; i++)
+			{
+				sum += cs[j*n + i];
+			}
+
+			// scale the shrinkage to be proportional to the contribution of this coefficient to the group total
+			for (ii i = gis[g]; i < gis[g + 1]; i++)
+			{
+				double scale = cs[j*n + i] / sum;
+				es[j*n + i] *= cs[j*n + i] / (scale * shrinkage * l2[j*n + i] + wcs[j*n + i]);
+			}
+		}
+	}
+}
+
+
+void
+BasisIsotopeDistribution::
+write_cs(const std::vector<fp>& cs) const
+{
+	for (ii j = 0; j < ns; j++)
+	{
+		ostringstream oss; oss << "profile" << j << ".csv";
+		ofstream ofs(oss.str());
+		ofs << "mass,intensity" << setprecision(10) << endl;
+
+		for (ii o = 0; o < ois.size() - 1; o++)
+		{
+			// sum up coefficients per group
+			fp sum = 0.0;
+			for (ii i = ois[o]; i < ois[o + 1]; i++)
+			{
+				sum += cs[j*nc / ns + i];
+			}
+			ofs << (parent->get_ci0s().front() + o) * parent->get_mass_interval() << "," << sum << endl;
+		}
+	}
 }

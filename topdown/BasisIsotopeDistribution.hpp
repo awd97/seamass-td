@@ -32,13 +32,15 @@ class BasisIsotopeDistribution : public Basis
 {
 private:
 	// Input
-	//BasisChargeDistribution* parent;
+	BasisChargeDistribution* parent;
 
 	// Sparse basis matrix A (same for each input spectrum)
 	SparseMatrix a;
 
 	// Output (cs) metadata
-	li ns, nc; // number of spectra and number of coefficients across all spectra
+	li ns, nc; // number of spectra and number of coefficients
+	std::vector<ii> ois; //output indicies into coefficients
+	std::vector<ii> gis; //group indicies into coefficients
 
 public:
 	BasisIsotopeDistribution(std::vector<Basis*>& bases, BasisChargeDistribution* parent,
@@ -52,6 +54,8 @@ public:
 	void l2norm(std::vector<fp>& es, const std::vector<fp>& fs) const;
 	void shrink(std::vector<fp>& es, const std::vector<fp>& cs, const std::vector<fp>& l2, const std::vector<fp>& wcs, double shrinkage) const;
 	li get_nc() const { return nc; }
+
+	void write_cs(const std::vector<fp>& cs) const;
 };
 
 

@@ -182,16 +182,15 @@ BasisChargeDistribution(vector<Basis*>& bases,
 	if (transient) cout << " (t)" << endl; else cout << " nc=" << nc << endl;
 	for (ii j = 0; j < js.size(); j++)
 	{
-		cout << endl;
 		cout << "  A[" << j << "]=";
 		as[j].print(cout);
+		cout << endl;
 	}
 
 	for (ii z = 0; z < max_z; z++)
 	{
-		cout << endl << "  z=" << z+1 << " co=" << cos[z] << " ci_range=[" << ci0s[z] << ":" << ci1s[z] << "]" << flush;
+		cout << "  z=" << z+1 << " co=" << cos[z] << " ci_range=[" << ci0s[z] << ":" << ci1s[z] << "]" << endl;
 	}
-	cout << endl;
 }
 
 

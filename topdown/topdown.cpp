@@ -153,7 +153,7 @@ namespace seamass
 
 		//////////////////////////////////////////////////////////////////////////////////
 		// OUTPUT
-		bChargeDistribution.write_cs(optimiser.get_cs()[bIsotopeDistribution.get_index()]);
+		bIsotopeDistribution.write_cs(optimiser.get_cs()[bIsotopeDistribution.get_index()]);
 
 		////////////////////////////////////////////////////////////////////////////////////
 		omp_set_num_threads(_threads);
