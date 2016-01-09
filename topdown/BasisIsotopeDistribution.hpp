@@ -41,6 +41,7 @@ private:
 	li ns, nc; // number of spectra and number of coefficients
 	std::vector<ii> ois; //output indicies into coefficients
 	std::vector<ii> gis; //group indicies into coefficients
+	std::vector<fp> ave_masses;
 
 public:
 	BasisIsotopeDistribution(std::vector<Basis*>& bases, BasisChargeDistribution* parent,

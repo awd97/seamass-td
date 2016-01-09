@@ -34,9 +34,10 @@ using namespace std;
 struct Factor
 {
 	ii gi;
+	fp ave_mass;
 	vector<fp> p;
 
-	Factor(ii _gi) : gi(_gi) {}
+	Factor(ii _gi) : gi(_gi), ave_mass(0.0) {}
 };
 
 
@@ -79,6 +80,7 @@ BasisIsotopeDistribution(vector<Basis*>& bases, BasisChargeDistribution* _parent
 			}
 			else
 			{
+				elem->second.ave_mass += j * isotope;
 				elem->second.p.push_back(isotope);
 			}
 		}
@@ -96,6 +98,7 @@ BasisIsotopeDistribution(vector<Basis*>& bases, BasisChargeDistribution* _parent
 	///////////////////////////////////////////////////////////////////////
 	// create A as a temporary COO matrix
 
+	ii ni = 0;
 	ii ng = 0;
 	ii nnz = 0;
 	for (ii oi = parent->get_ci0s().front(); oi <= parent->get_ci1s().back(); oi++)
@@ -123,6 +126,7 @@ BasisIsotopeDistribution(vector<Basis*>& bases, BasisChargeDistribution* _parent
 						nnz++;
 					}
 				}
+				ni++;
 			}
 		}
 	}
@@ -134,6 +138,7 @@ BasisIsotopeDistribution(vector<Basis*>& bases, BasisChargeDistribution* _parent
 	gis[0] = 0;
 	ois.resize(parent->get_ci1s().back() - parent->get_ci0s().front() + 1);
 	ois[0] = 0;
+	ave_masses.resize(ni);
 
 	ii ci = 0;
 	ii gi = 0;
@@ -167,6 +172,7 @@ BasisIsotopeDistribution(vector<Basis*>& bases, BasisChargeDistribution* _parent
 						k++;
 					}
 				}
+				ave_masses[ci] = fs.first->second.ave_mass;
 				ci++;
 			}
 		}
@@ -257,21 +263,24 @@ void
 BasisIsotopeDistribution::
 write_cs(const std::vector<fp>& cs) const
 {
+	ii n = nc / ns;
 	for (ii j = 0; j < ns; j++)
 	{
 		ostringstream oss; oss << "profile" << j << ".csv";
 		ofstream ofs(oss.str());
-		ofs << "mass,intensity" << setprecision(10) << endl;
+		ofs << "mass,intensity,ave_mass" << setprecision(10) << endl;
 
 		for (ii o = 0; o < ois.size() - 1; o++)
 		{
 			// sum up coefficients per group
 			fp sum = 0.0;
+			fp ave_mass = 0.0;
 			for (ii i = ois[o]; i < ois[o + 1]; i++)
 			{
-				sum += cs[j*nc / ns + i];
+				sum += cs[j*n + i];
+				sum += cs[j*n + i] * ave_masses[j*n + i];
 			}
-			ofs << (parent->get_ci0s().front() + o) * parent->get_mass_interval() << "," << sum << endl;
+			ofs << (parent->get_ci0s().front() + o) * parent->get_mass_interval() << "," << sum << "," << ave_mass << endl;
 		}
 	}
 }
