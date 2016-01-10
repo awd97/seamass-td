@@ -238,33 +238,32 @@ shrink(std::vector<fp>& es, const std::vector<fp>& cs, const std::vector<fp>& l2
 {
 	// GROUP-WISE SHRINKAGE! (note - intuitive implemention, not mathematically verified yet)
 	// also horrible gather operation
-	for (li j = 0; j < as.size(); j++)
+	vector<fp> gcs(ci1s.back() - ci0s.front() + 1, 0.0);
+
+	// sum up coefficients per group
+	for (ii z = 0; z < cos.size() - 1; z++)
+	for (ii i = cos[z]; i < cos[z + 1]; i++)
+	for (ii j = 0; j < as.size(); j++)
+	if (es[j*cos.back() + i] > 0.0)
 	{
-		vector<fp> gcs(ci1s.back() - ci0s.front() + 1, 0.0);
+		gcs[i - cos[z] + ci0s[z] - ci0s.front()] += cs[j*cos.back() + i];
+	}
 
-		// sum up coefficients per group
-		for (ii z = 0; z < cos.size() - 1; z++)
-		for (ii i = cos[z]; i < cos[z + 1]; i++)
-		if (es[j*cos.back() + i] > 0.0)
+	// scale the shrinkage to be proportional to the contribution of this coefficient to the group total
+	#pragma omp parallel for
+	for (ii z = 0; z < cos.size(); z++)
+	for (ii i = cos[z]; i < cos[z + 1]; i++)
+	for (ii j = 0; j < as.size(); j++)
+	if (es[j*cos.back() + i] > 0.0)
+	{
+		if (cs[j*cos.back() + i] > 0.0)
 		{
-			gcs[i - cos[z] + ci0s[z] - ci0s.front()] += cs[j*cos.back() + i];
+			double scale = cs[j*cos.back() + i] / gcs[i - cos[z] + ci0s[z] - ci0s.front()];
+			es[j*cos.back() + i] *= cs[j*cos.back() + i] / (scale * shrinkage * l2[j*cos.back() + i] + wcs[j*cos.back() + i]);
 		}
-
-		// scale the shrinkage to be proportional to the contribution of this coefficient to the group total
-		#pragma omp parallel for
-		for (ii z = 0; z < cos.size(); z++)
-		for (ii i = cos[z]; i < cos[z + 1]; i++)
-		if (es[j*cos.back() + i] > 0.0)
+		else
 		{
-			if (cs[j*cos.back() + i] > 0.0)
-			{
-				double scale = cs[j*cos.back() + i] / gcs[i - cos[z] + ci0s[z] - ci0s.front()];
-				es[j*cos.back() + i] *= cs[j*cos.back() + i] / (scale * shrinkage * l2[j*cos.back() + i] + wcs[j*cos.back() + i]);
-			}
-			else
-			{
-				es[j*cos.back() + i] = 0.0;
-			}
+			es[j*cos.back() + i] = 0.0;
 		}
 	}
 }
@@ -274,26 +273,24 @@ void
 BasisChargeDistribution::
 write_cs(const std::vector<fp>& cs) const
 {
+	ostringstream oss; oss << "profile" << get_index() << ".csv";
+	ofstream ofs(oss.str());
+
+	// sum up coefficients per group
+	vector<fp> gcs(ci1s.back() - ci0s.front() + 1, 0.0);
+	for (ii z = 0; z < cos.size() - 1; z++)
+	for (ii i = cos[z]; i < cos[z + 1]; i++)
 	for (li j = 0; j < as.size(); j++)
 	{
-		ostringstream oss; oss << "profile" << j << ".csv";
-		ofstream ofs(oss.str());
+		gcs[i - cos[z] + ci0s[z] - ci0s.front()] += cs[j*cos.back() + i];
+	}
 
-		// sum up coefficients per group
-		vector<fp> gcs(ci1s.back() - ci0s.front() + 1, 0.0);
-		for (ii z = 0; z < cos.size() - 1; z++)
-		for (ii i = cos[z]; i < cos[z + 1]; i++)
+	ofs << "mass,intensity" << setprecision(10) << endl;
+	for (ii i = 0; i < gcs.size(); ++i)
+	{
+		if (gcs[i] > 0.0 || i > 0 && gcs[i - 1] > 0.0 || i < gcs.size() - 1 && gcs[i + 1] > 0.0)
 		{
-			gcs[i - cos[z] + ci0s[z] - ci0s.front()] += cs[j*cos.back() + i];
-		}
-
-		ofs << "mass,intensity" << setprecision(10) << endl;
-		for (ii i = 0; i < gcs.size(); ++i)
-		{
-			if (gcs[i] > 0.0 || i > 0 && gcs[i - 1] > 0.0 || i < gcs.size() - 1 && gcs[i + 1] > 0.0)
-			{
-				ofs << (ci0s.front() + i) * mass_interval << "," << gcs[i] << endl;
-			}
+			ofs << (ci0s.front() + i) * mass_interval << "," << gcs[i] << endl;
 		}
 	}
 }

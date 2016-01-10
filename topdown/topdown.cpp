@@ -154,6 +154,17 @@ namespace seamass
 		//////////////////////////////////////////////////////////////////////////////////
 		// OUTPUT
 		bIsotopeDistribution.write_cs(optimiser.get_cs()[bIsotopeDistribution.get_index()]);
+		
+		vector<fp> ts(bChargeDistribution.get_nc());
+		bIsotopeDistribution.synthesis(ts, optimiser.get_cs()[bIsotopeDistribution.get_index()]);
+		bChargeDistribution.write_cs(ts);
+
+		vector<fp> fs(gs.size());
+		bChargeDistribution.synthesis(fs, ts);
+		ofstream ofs("fs.csv");
+		for (ii i = 0; i < fs.size(); i++) ofs << fs[i] << endl;
+		ofstream ofs2("gs.csv");
+		for (ii i = 0; i < gs.size(); i++) ofs2 << gs[i] << endl;
 
 		////////////////////////////////////////////////////////////////////////////////////
 		omp_set_num_threads(_threads);

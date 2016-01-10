@@ -69,7 +69,7 @@ BasisIsotopeDistribution(vector<Basis*>& bases, BasisChargeDistribution* _parent
 
 		ifs >> comma >> z >> comma >> fgi;
 		map<ii,Factor>::iterator elem = factors->insert(pair<ii,Factor>(fi, Factor(fgi)));
-		for (ii j = 0; j < 21; j++)
+		for (ii j = 0; j < 101; j++)
 		{
 			fp isotope;
 			ifs >> comma >> isotope;
@@ -172,7 +172,7 @@ BasisIsotopeDistribution(vector<Basis*>& bases, BasisChargeDistribution* _parent
 						k++;
 					}
 				}
-				ave_masses[ci] = fs.first->second.ave_mass;
+				//ave_masses[ci] = fs.first->second.ave_mass;
 				ci++;
 			}
 		}
@@ -236,24 +236,23 @@ shrink(std::vector<fp>& es, const std::vector<fp>& cs, const std::vector<fp>& l2
 {
 	// GROUP-WISE SHRINKAGE! (note - intuitive implemention, not mathematically verified yet)
 	ii n = nc / ns;
-	for (ii j = 0; j < ns; j++)
+	#pragma omp parallel for
+	for (ii g = 0; g < gis.size() - 1; g++)
 	{
-		#pragma omp parallel for
-		for (ii g = 0; g < gis.size() - 1; g++)
+		// sum up coefficients per group
+		fp sum = 0.0;
+		for (ii j = 0; j < ns; j++)
+		for (ii i = gis[g]; i < gis[g + 1]; i++)
 		{
-			// sum up coefficients per group
-			fp sum = 0.0;
-			for (ii i = gis[g]; i < gis[g + 1]; i++)
-			{
-				sum += cs[j*n + i];
-			}
+			sum += cs[j*n + i];
+		}
 
-			// scale the shrinkage to be proportional to the contribution of this coefficient to the group total
-			for (ii i = gis[g]; i < gis[g + 1]; i++)
-			{
-				double scale = cs[j*n + i] / sum;
-				es[j*n + i] *= cs[j*n + i] / (scale * shrinkage * l2[j*n + i] + wcs[j*n + i]);
-			}
+		// scale the shrinkage to be proportional to the contribution of this coefficient to the group total
+		for (ii j = 0; j < ns; j++)
+		for (ii i = gis[g]; i < gis[g + 1]; i++)
+		{
+			double scale = cs[j*n + i] / sum;
+			es[j*n + i] *= cs[j*n + i] / (scale * shrinkage * l2[j*n + i] + wcs[j*n + i]);
 		}
 	}
 }
@@ -264,23 +263,58 @@ BasisIsotopeDistribution::
 write_cs(const std::vector<fp>& cs) const
 {
 	ii n = nc / ns;
-	for (ii j = 0; j < ns; j++)
+	vector<fp> sums(ois.size() - 1, 0.0);
+	for (ii o = 0; o < ois.size() - 1; o++)
 	{
-		ostringstream oss; oss << "profile" << j << ".csv";
-		ofstream ofs(oss.str());
-		ofs << "mass,intensity,ave_mass" << setprecision(10) << endl;
-
-		for (ii o = 0; o < ois.size() - 1; o++)
+		for (ii j = 0; j < ns; j++)
+		for (ii i = ois[o]; i < ois[o + 1]; i++)
 		{
-			// sum up coefficients per group
-			fp sum = 0.0;
-			fp ave_mass = 0.0;
-			for (ii i = ois[o]; i < ois[o + 1]; i++)
+			sums[o] += cs[j*n + i];
+		}
+	}
+
+	ostringstream oss; oss << "profile" << get_index() << ".csv";
+	ofstream ofs(oss.str());
+	ofs << "mass,intensity" << setprecision(10) << endl;
+	for (ii o = 0; o < ois.size() - 1; o++)
+	{
+		if (sums[o] > 0.0 || o > 0 && sums[o - 1] > 0.0 || o < sums.size() - 1 && sums[o + 1] > 0.0)
+		{
+			ofs << (parent->get_ci0s().front() + o) * parent->get_mass_interval() << "," << sums[o] << endl;
+		}
+	}
+
+	ostringstream oss2; oss2 << "all" << get_index() << ".csv";
+	ofstream ofs2(oss2.str());
+	ofs2 << "mass,intensity";
+	for (ii f = 0; f < 3; f++)
+	for (ii z = 0; z < parent->get_ci0s().size(); z++)
+	{
+		ofs2 << "," << "z" << z+1 << "." << f;
+	} 
+	ofs2 << setprecision(10) << endl;
+	for (ii o = 0; o < ois.size() - 1; o++)
+	{
+		if (sums[o] > 0.0 || o > 0 && sums[o - 1] > 0.0 || o < sums.size() - 1 && sums[o + 1] > 0.0)
+		{
+			ofs2 << (parent->get_ci0s().front() + o) * parent->get_mass_interval() << "," << sums[o];
+
+			for (ii i = ois[o]; i < ois[o + 1];)
 			{
-				sum += cs[j*n + i];
-				sum += cs[j*n + i] * ave_masses[j*n + i];
+				for (ii z = 0; z < parent->get_ci0s().size(); z++)
+				{
+					ofs2 << ",";
+					if (parent->get_ci0s().front() + o >= parent->get_ci0s()[z] && parent->get_ci0s().front() + o <= parent->get_ci1s()[z])
+					{
+						fp sum = 0.0;
+						for (ii j = 0; j < ns; j++) sum += cs[j*n + i];
+						ofs2 << sum;
+						i++;
+					}						
+				}
 			}
-			ofs << (parent->get_ci0s().front() + o) * parent->get_mass_interval() << "," << sum << "," << ave_mass << endl;
+
+			ofs2 << endl;
 		}
 	}
 }
