@@ -52,9 +52,11 @@ namespace seamass
 	void
 	topdown(const std::string& id, const std::string& config_id, int instrument_type,
 		    vector<double>& rts, vector< vector<double> >& mzs, vector< vector<double> >& intensities,
-		    ii out_res, ii max_z, double max_peak_width, int shrink, int tol,
+		    int out_res, int max_z, double max_peak_width, int shrink, int tol,
 		    int threads, int debug)
 	{
+        cout << "SIZE: " << sizeof(ii) << endl;
+        
 		double start = omp_get_wtime();
 		int _threads = omp_get_num_threads();
 		omp_set_num_threads(threads);
@@ -105,6 +107,7 @@ namespace seamass
 		for (ii i = 0; grad > tolerance; i++)
 		{
 			grad = optimiser.step(i, shrinkage);
+            if (isnan(grad)) grad = 1.0;
 
 			li nnz = 0;
 			for (ii j = 0; j < (ii)bases.size(); j++)
@@ -132,6 +135,7 @@ namespace seamass
 		for (ii i = 0; grad > tolerance; i++)
 		{
 			grad = optimiser.step(i, 0.0);
+            if (isnan(grad)) grad = 1.0;
 
 			li nnz = 0;
 			for (ii j = 0; j < (ii)bases.size(); j++)

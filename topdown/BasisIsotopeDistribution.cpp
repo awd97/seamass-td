@@ -274,7 +274,7 @@ write_cs(const std::vector<fp>& cs) const
 	}
 
 	ostringstream oss; oss << "profile" << get_index() << ".csv";
-	ofstream ofs(oss.str());
+	ofstream ofs(oss.str().c_str());
 	ofs << "mass,intensity" << setprecision(10) << endl;
 	for (ii o = 0; o < ois.size() - 1; o++)
 	{
@@ -285,7 +285,7 @@ write_cs(const std::vector<fp>& cs) const
 	}
 
 	ostringstream oss2; oss2 << "all" << get_index() << ".csv";
-	ofstream ofs2(oss2.str());
+	ofstream ofs2(oss2.str().c_str());
 	ofs2 << "mass,intensity";
 	for (ii f = 0; f < 3; f++)
 	for (ii z = 0; z < parent->get_ci0s().size(); z++)

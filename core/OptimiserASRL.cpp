@@ -165,13 +165,13 @@ threshold(double thresh)
         if (cs[j][i] < thresh) cs[j][i] = 0.0;
     }
     
-    for (ii j = 0; j < (ii) bases.size(); j++)
-    if (!bases[j]->is_transient())
-    #pragma omp parallel for
-    for (li i = 0; i < (li) bases[j]->get_nc(); i++)
-    {
-        cs[j][i] /= info.volume;
-    }
+    //for (ii j = 0; j < (ii) bases.size(); j++)
+    //if (!bases[j]->is_transient())
+    //#pragma omp parallel for
+    //for (li i = 0; i < (li) bases[j]->get_nc(); i++)
+    //{
+    //    cs[j][i] /= info.volume;
+    //}
 }
 
 

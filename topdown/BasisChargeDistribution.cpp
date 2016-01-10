@@ -274,7 +274,7 @@ BasisChargeDistribution::
 write_cs(const std::vector<fp>& cs) const
 {
 	ostringstream oss; oss << "profile" << get_index() << ".csv";
-	ofstream ofs(oss.str());
+	ofstream ofs(oss.str().c_str());
 
 	// sum up coefficients per group
 	vector<fp> gcs(ci1s.back() - ci0s.front() + 1, 0.0);

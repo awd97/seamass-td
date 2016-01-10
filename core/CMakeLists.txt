@@ -1,4 +1,6 @@
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/Modules/")
+
+ADD_DEFINITIONS(-DMKL_ILP64)
 find_package(MKL REQUIRED)
 
 add_library(seamass_core
