@@ -49,8 +49,6 @@ BasisIsotopeDistribution(vector<Basis*>& bases, BasisChargeDistribution* _parent
 	ns(parent->get_ns()),
 	nc(parent->get_nc())
 {
-	cout << get_index() << " BasisIsotopeDistribution " << flush;
-
 	///////////////////////////////////////////////////////////////////////
 	// load learnt factors into multimap
 
@@ -59,6 +57,7 @@ BasisIsotopeDistribution(vector<Basis*>& bases, BasisChargeDistribution* _parent
 	ii fi0 = parent->get_ci0s().front() / (1 << (out_res - factor_res));
 	ii fi1 = parent->get_ci1s().back() / (1 << (out_res - factor_res));
 
+	cout << get_index() << " BasisIsotopeDistribution " << flush;
 	while (ifs.good())
 	{
 		char comma;
@@ -143,6 +142,7 @@ BasisIsotopeDistribution(vector<Basis*>& bases, BasisChargeDistribution* _parent
 	ii ci = 0;
 	ii gi = 0;
 	ii k = 0;
+	cout << get_index() << " BasisIsotopeDistribution " << flush;
 	for (ii oi = parent->get_ci0s().front(); oi <= parent->get_ci1s().back(); oi++)
 	{
 		ii fi = oi / (1 << (out_res - factor_res));
@@ -177,7 +177,14 @@ BasisIsotopeDistribution(vector<Basis*>& bases, BasisChargeDistribution* _parent
 			}
 		}
 		ois[oi - parent->get_ci0s().front() + 1] = ci;
+
+		if (oi % 1000 == 0)
+		{
+			for (int i = 0; i < 256; ++i) cout << '\b';
+			cout << get_index() << " BasisIsotopeDistribution " << setw(1 + (int)(log10((float)parent->get_ci1s().back() - parent->get_ci0s().front() + 1))) << oi << "/" << parent->get_ci1s().back() - parent->get_ci0s().front() + 1 << " " << flush;
+		}
 	}
+	for (int i = 0; i < 256; ++i) cout << '\b';
 	nc = ns * ci;
 
 	// create A
