@@ -41,7 +41,7 @@ namespace seamass
 				 std::vector<double>& rts,
 				 std::vector< std::vector<double> >& mzs,
 				 std::vector< std::vector<double> >& intensities,
-				 int out_res, int max_z, double max_peak_width, int shrink, int tol,
+				 double out_mass0, double out_mass1, int out_res, int max_z, double max_peak_width, int shrink, int tol,
 				 int threads = 1, int debug = 0);
 }
 

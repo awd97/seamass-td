@@ -181,7 +181,7 @@ BasisIsotopeDistribution(vector<Basis*>& bases, BasisChargeDistribution* _parent
 		if (oi % 1000 == 0)
 		{
 			for (int i = 0; i < 256; ++i) cout << '\b';
-			cout << get_index() << " BasisIsotopeDistribution " << setw(1 + (int)(log10((float)parent->get_ci1s().back() - parent->get_ci0s().front() + 1))) << oi << "/" << parent->get_ci1s().back() - parent->get_ci0s().front() + 1 << " " << flush;
+			cout << get_index() << " BasisIsotopeDistribution " << setw(1 + (int)(log10((float)parent->get_ci1s().back() - parent->get_ci0s().front() + 1))) << oi - parent->get_ci0s().front() << "/" << parent->get_ci1s().back() - parent->get_ci0s().front() + 1 << " " << flush;
 		}
 	}
 	for (int i = 0; i < 256; ++i) cout << '\b';
@@ -322,6 +322,23 @@ write_cs(const std::vector<fp>& cs) const
 			}
 
 			ofs2 << endl;
+		}
+	}
+}
+
+void
+BasisIsotopeDistribution::
+restrict_range(std::vector<fp>& cs, double mass0, double mass1) const
+{
+	ii n = nc / ns;
+	vector<fp> sums(ois.size() - 1, 0.0);
+	for (ii o = 0; o < ois.size() - 1; o++)
+	{
+		if ((parent->get_ci0s().front() + o) * parent->get_mass_interval() < mass0 || (parent->get_ci0s().front() + o) * parent->get_mass_interval()  > mass1)
+		for (ii j = 0; j < ns; j++)
+		for (ii i = ois[o]; i < ois[o + 1]; i++)
+		{
+			cs[j*n + i] = 0.0;
 		}
 	}
 }

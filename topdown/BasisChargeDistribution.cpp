@@ -294,3 +294,4 @@ write_cs(const std::vector<fp>& cs) const
 		}
 	}
 }
+

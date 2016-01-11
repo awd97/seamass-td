@@ -55,7 +55,7 @@ public:
 
     void threshold(double threshold);
 
-    const std::vector< std::vector<fp> >& get_cs() const { return cs; }
+    std::vector< std::vector<fp> >& get_cs() { return cs; }
 	const std::vector< std::vector<fp> >& get_l2() const { return l2; }
 	const Info& get_info() const { return info; }
 };

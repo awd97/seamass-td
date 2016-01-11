@@ -69,12 +69,9 @@ bool seamass_order(const spectrum& lhs, const spectrum& rhs)
 
 int main(int argc, char *argv[])
 {
-	cout << argv[0] << endl;
-
-
 	H5::Exception::dontPrint();
 	seamass::topdown_notice();
-	if (argc != 9)
+	if (argc != 11)
 	{
 		cout << "seaMass-TD (Top Down) Usage" << endl;
 		cout << "-----" << endl;
@@ -82,8 +79,10 @@ int main(int argc, char *argv[])
 		cout << endl;
 		cout << "<in_file>:   Raw input file in seaMass Input format (smj)" << endl;
 		cout << "             guidelines: Use pwiz-seamass to convert from mzML or vendor format" << endl;
-		cout << "<out_res>:   Output resolution interval between output data points is ~1.00286 / 2^out_res" << endl;
-		cout << "             guidelines: around 5" << endl;
+		cout << "<out_mass0>: Minimum mass considered" << endl;
+		cout << "             " << endl;
+		cout << "<out_mass1>: Maximum mass considered" << endl;
+		cout << "             " << endl;
 		cout << "<max_z>:     Maximum charge state to consider" << endl;
 		cout << "             guidelines: as low as possible but must be higher than what you expect is visible" << endl;
 		cout << "<peak_fwhm>: The mass resolution (fwhm @ 400 m/z)" << endl;
@@ -99,13 +98,15 @@ int main(int argc, char *argv[])
 		return 0;
 	}
 	string in_file = argv[1];
-	int mass_res = atoi(argv[2]);
-	int max_z = atoi(argv[3]);
-	double max_peak_width = atof(argv[4]);
-	int shrink = atoi(argv[5]);
-	int tol = atoi(argv[6]);
-	int threads = atoi(argv[7]);
-	int out_type = atoi(argv[8]);
+	double mass0 = atof(argv[2]);
+	double mass1 = atof(argv[3]);
+	int mass_res = atoi(argv[4]);
+	int max_z = atoi(argv[5]);
+	double max_peak_width = atof(argv[6]);
+	int shrink = atoi(argv[7]);
+	int tol = atoi(argv[8]);
+	int threads = atoi(argv[9]);
+	int out_type = atoi(argv[10]);
 
 	int lastdot = in_file.find_last_of("."); 
 	string id = (lastdot == string::npos) ? in_file : in_file.substr(0, lastdot); 
@@ -201,7 +202,7 @@ int main(int argc, char *argv[])
 					oss.str().c_str(),
 					instrument_type,
 					scan_start_times, mzs, intensities,
-					mass_res, max_z, max_peak_width, shrink, tol,
+					mass0, mass1, mass_res, max_z, max_peak_width, shrink, tol,
 					threads, out_type);
 			}
             loaded = 0;

@@ -52,7 +52,7 @@ namespace seamass
 	void
 	topdown(const std::string& id, const std::string& config_id, int instrument_type,
 		    vector<double>& rts, vector< vector<double> >& mzs, vector< vector<double> >& intensities,
-		    int out_res, int max_z, double max_peak_width, int shrink, int tol,
+		    double out_mass0, double out_mass1, int out_res, int max_z, double max_peak_width, int shrink, int tol,
 		    int threads, int debug)
 	{
         cout << "SIZE: " << sizeof(ii) << endl;
@@ -103,6 +103,8 @@ namespace seamass
 		if (!bases[j]->is_transient())
 			nc += bases[j]->get_nc();
 		cout << " L1 nc=" << nc << " shrinkage=" << shrink << ":" << fixed << setprecision(2) << shrinkage << " tolerance=" << tol << ":" << setprecision(6) << tolerance << endl;
+
+		bIsotopeDistribution.restrict_range(optimiser.get_cs()[bIsotopeDistribution.get_index()], out_mass0, out_mass1);
 
 		for (ii i = 0; grad > tolerance; i++)
 		{

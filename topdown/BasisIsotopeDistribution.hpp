@@ -57,6 +57,7 @@ public:
 	li get_nc() const { return nc; }
 
 	void write_cs(const std::vector<fp>& cs) const;
+	void restrict_range(std::vector<fp>& cs, double mass0, double mass1) const;
 };
 
 
