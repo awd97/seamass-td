@@ -154,22 +154,23 @@ namespace seamass
 			cout << "  nnz: " << setw(8) << setprecision(5) << nnz;
 			cout << "  grad: " << setiosflags(ios::fixed) << setprecision(6) << setw(8) << grad << endl;
 		}
-
+        cout << "a" << endl;
 		//////////////////////////////////////////////////////////////////////////////////
 		// OUTPUT
 		bIsotopeDistribution.write_cs(optimiser.get_cs()[bIsotopeDistribution.get_index()]);
-		
+		cout << "b" << endl;
 		vector<fp> ts(bChargeDistribution.get_nc());
 		bIsotopeDistribution.synthesis(ts, optimiser.get_cs()[bIsotopeDistribution.get_index()]);
-		bChargeDistribution.write_cs(ts);
-
+		cout << "c" << endl;
+        bChargeDistribution.write_cs(ts);
+        cout << "d" << endl;
 		vector<fp> fs(gs.size());
 		bChargeDistribution.synthesis(fs, ts);
 		ofstream ofs("fs.csv");
 		for (ii i = 0; i < fs.size(); i++) ofs << fs[i] << endl;
 		ofstream ofs2("gs.csv");
 		for (ii i = 0; i < gs.size(); i++) ofs2 << gs[i] << endl;
-
+        cout << "e" << endl;
 		////////////////////////////////////////////////////////////////////////////////////
 		omp_set_num_threads(_threads);
 		cout << "Duration: " << (omp_get_wtime() - start) / 60.0 << "mins" << endl;
