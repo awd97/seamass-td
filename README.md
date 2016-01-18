@@ -1,7 +1,9 @@
 seaMass-TD
 =======
 
-seaMass decharging and deisotoping of Top Down spectra
+seaMass-TD is the first method to deconvolute top down proteomics spectra that infers high resolution output on isotopically unresolved input.
+
+See [here](http://www.biospi.org/research/ms/seamass-td/) for more information.
 
 dependencies
 -------
