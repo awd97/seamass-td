@@ -25,6 +25,7 @@
 
 
 #include <mkl.h>
+#include <mkl_spblas.h>
 #include <iostream>
 #include <vector>
 
@@ -40,13 +41,38 @@ private:
 	ii m;
 	ii n;
 
+	sparse_matrix_t a;
+	sparse_matrix_t sqr_a;
+
+public:
+	SparseMatrix();
+	~SparseMatrix();
+
+	void init(ii m, ii n, std::vector<fp>& acoo, std::vector<ii>& rowind, std::vector<ii>& colind);
+
+	void mult(fp* bs, const fp* xs, bool transpose = false, bool accum = false) const;
+	void sqr_mult(fp* bs, const fp* xs, bool transpose = false, bool accum = false) const;
+
+	ii get_m() const { return m; }
+	ii get_n() const { return n; }
+
+	void print(std::ostream& out) const;
+};
+
+
+class SparseMatrixOld
+{
+private:
+	ii m;
+	ii n;
+
 	fp* a;
 	ii* ia;
 	ii* ja;
 
 public:
-	SparseMatrix();
-	~SparseMatrix();
+	SparseMatrixOld();
+	~SparseMatrixOld();
 
 	void init(ii m, ii n, std::vector<fp>& acoo, std::vector<ii>& rowind, std::vector<ii>& colind);
 

@@ -208,7 +208,7 @@ step(ii iteration, double shrinkage)
         vector<fp>().swap(ts[j]);
     }
     //synthesis root
-    vector<fp> fs(gs.size());
+	vector<fp> fs(gs.size());
     if (ts.front().size() == 0)
     {
         bases.front()->synthesis(fs, cs.front());
@@ -230,7 +230,7 @@ step(ii iteration, double shrinkage)
     double error_duration = omp_get_wtime() - error_start;
     static double culm_error_duration = 0.0;
     culm_error_duration += error_duration;
-    
+
     double analysis_start = omp_get_wtime();
     // analysis root
     vector< vector<fp> > es(bases.size());
@@ -265,7 +265,7 @@ step(ii iteration, double shrinkage)
     double shrinkage_duration = omp_get_wtime() - shrinkage_start;
     static double culm_shrinkage_duration = 0.0;
     culm_shrinkage_duration += shrinkage_duration;
-    
+
     double accel_start = omp_get_wtime();
     // unaccelerated update
     double sum = 0.0;

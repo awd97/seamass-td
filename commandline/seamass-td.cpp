@@ -83,6 +83,8 @@ int main(int argc, char *argv[])
 		cout << "             " << endl;
 		cout << "<out_mass1>: Maximum mass considered" << endl;
 		cout << "             " << endl;
+		cout << "<mass_res>:  Mass resolution" << endl;
+		cout << "             " << endl;
 		cout << "<max_z>:     Maximum charge state to consider" << endl;
 		cout << "             guidelines: as low as possible but must be higher than what you expect is visible" << endl;
 		cout << "<peak_fwhm>: The mass resolution (fwhm @ 400 m/z)" << endl;
@@ -112,7 +114,7 @@ int main(int argc, char *argv[])
 	string id = (lastdot == string::npos) ? in_file : in_file.substr(0, lastdot); 
 
 	// open H5 file
-	H5::H5File file(in_file, H5F_ACC_RDONLY);
+	H5::H5File file("c:\\s\\TopDown\\ubiquitin\\ubiquitin_5uM_1mTorr_1uscan.smj", H5F_ACC_RDONLY);
 
 	// query necessary metadata
     hsize_t ns;

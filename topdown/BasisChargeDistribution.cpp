@@ -250,8 +250,8 @@ shrink(std::vector<fp>& es, const std::vector<fp>& cs, const std::vector<fp>& l2
 	}
 
 	// scale the shrinkage to be proportional to the contribution of this coefficient to the group total
-	#pragma omp parallel for
-	for (ii z = 0; z < cos.size(); z++)
+	//#pragma omp parallel for
+	for (ii z = 0; z < cos.size() - 1; z++)
 	for (ii i = cos[z]; i < cos[z + 1]; i++)
 	for (ii j = 0; j < as.size(); j++)
 	if (es[j*cos.back() + i] > 0.0)

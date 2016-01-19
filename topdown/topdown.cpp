@@ -81,11 +81,11 @@ namespace seamass
 		ii order = 3; // B-spline order
 
 		// Construct BasisChargeDistribution, which gets added as the root node of bases
-		BasisChargeDistribution bChargeDistribution(bases, mzs, gs, is, js, 1.00286084990559, out_res, 0, max_z, max_peak_width, true);
+		BasisChargeDistribution bChargeDistribution(bases, mzs, gs, is, js, 1.00286084990559, out_res, 0, max_z, max_peak_width);
 		for (ii j = 0; j < (ii)mzs.size(); j++) vector<double>().swap(mzs[j]);
 
 		// Construct BasisIsotopeDistribution, which gets added to bases with bChargeDistribution as parent
-		BasisIsotopeDistribution bIsotopeDistribution(bases, &bChargeDistribution, out_res, 0, max_z);
+		//BasisIsotopeDistribution bIsotopeDistribution(bases, &bChargeDistribution, out_res, 0, max_z);
 
 		////////////////////////////////////////////////////////////////////////////////////
 		// OPTIMISATION
@@ -104,7 +104,7 @@ namespace seamass
 			nc += bases[j]->get_nc();
 		cout << " L1 nc=" << nc << " shrinkage=" << shrink << ":" << fixed << setprecision(2) << shrinkage << " tolerance=" << tol << ":" << setprecision(6) << tolerance << endl;
 
-		bIsotopeDistribution.restrict_range(optimiser.get_cs()[bIsotopeDistribution.get_index()], out_mass0, out_mass1);
+		//bIsotopeDistribution.restrict_range(optimiser.get_cs()[bIsotopeDistribution.get_index()], out_mass0, out_mass1);
 
 		for (ii i = 0; grad > tolerance; i++)
 		{
@@ -156,23 +156,23 @@ namespace seamass
 			cout << "  nnz: " << setw(8) << setprecision(5) << nnz;
 			cout << "  grad: " << setiosflags(ios::fixed) << setprecision(6) << setw(8) << grad << endl;
 		}
-        cout << "a" << endl;
+        //cout << "a" << endl;
 		//////////////////////////////////////////////////////////////////////////////////
 		// OUTPUT
-		bIsotopeDistribution.write_cs(optimiser.get_cs()[bIsotopeDistribution.get_index()]);
-		cout << "b" << endl;
-		vector<fp> ts(bChargeDistribution.get_nc());
-		bIsotopeDistribution.synthesis(ts, optimiser.get_cs()[bIsotopeDistribution.get_index()]);
-		cout << "c" << endl;
-        bChargeDistribution.write_cs(ts);
-        cout << "d" << endl;
-		vector<fp> fs(gs.size());
-		bChargeDistribution.synthesis(fs, ts);
-		ofstream ofs("fs.csv");
-		for (ii i = 0; i < fs.size(); i++) ofs << fs[i] << endl;
-		ofstream ofs2("gs.csv");
-		for (ii i = 0; i < gs.size(); i++) ofs2 << gs[i] << endl;
-        cout << "e" << endl;
+		//bIsotopeDistribution.write_cs(optimiser.get_cs()[bIsotopeDistribution.get_index()]);
+		//cout << "b" << endl;
+		//vector<fp> ts(bChargeDistribution.get_nc());
+		//bIsotopeDistribution.synthesis(ts, optimiser.get_cs()[bIsotopeDistribution.get_index()]);
+		//cout << "c" << endl;
+		bChargeDistribution.write_cs(optimiser.get_cs()[bChargeDistribution.get_index()]);
+        //cout << "d" << endl;
+		//vector<fp> fs(gs.size());
+		//bChargeDistribution.synthesis(fs, ts);
+		//ofstream ofs("fs.csv");
+		//for (ii i = 0; i < fs.size(); i++) ofs << fs[i] << endl;
+		//ofstream ofs2("gs.csv");
+		//for (ii i = 0; i < gs.size(); i++) ofs2 << gs[i] << endl;
+        //cout << "e" << endl;
 		////////////////////////////////////////////////////////////////////////////////////
 		omp_set_num_threads(_threads);
 		cout << "Duration: " << (omp_get_wtime() - start) / 60.0 << "mins" << endl;
