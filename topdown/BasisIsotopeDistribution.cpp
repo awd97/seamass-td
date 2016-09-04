@@ -114,10 +114,10 @@ BasisIsotopeDistribution(vector<Basis*>& bases, BasisChargeDistribution* _parent
 			}
 
 			Factor& fac = fs.second->second;
-			for (ii z = 0; z < parent->get_ci0s().size(); z++)
+			for (ii z = 0; z < (ii) parent->get_ci0s().size(); z++)
 			if (oi >= parent->get_ci0s()[z] && oi <= parent->get_ci1s()[z])
 			{
-				for (ii i = 0; i < fs.first->second.p.size(); i++)
+				for (ii i = 0; i < (ii) fs.first->second.p.size(); i++)
 				{
 					ii pi = oi + i * (1 << out_res);
 					if (pi <= parent->get_ci1s()[z])
@@ -158,10 +158,10 @@ BasisIsotopeDistribution(vector<Basis*>& bases, BasisChargeDistribution* _parent
 			}
 
 			Factor& fac = fs.second->second;
-			for (ii z = 0; z < parent->get_ci0s().size(); z++)
+			for (ii z = 0; z < (ii) parent->get_ci0s().size(); z++)
 			if (oi >= parent->get_ci0s()[z] && oi <= parent->get_ci1s()[z])
 			{
-				for (ii i = 0; i < fs.first->second.p.size(); i++)
+				for (ii i = 0; i < (ii) fs.first->second.p.size(); i++)
 				{
 					ii pi = oi + i * (1 << out_res);
 					if (pi <= parent->get_ci1s()[z])

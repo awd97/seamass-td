@@ -42,8 +42,8 @@ double
 BSpline::
 ibasis(double x)
 {
-	double f = x * n;
-	double i = (ii)f;
+	double f = x / (order + 1) * n;
+	ii i = (ii) f;
 	f = f - i;
 	return (1-f)*lookup[i] + f*lookup[i+1];
 }
@@ -51,7 +51,7 @@ ibasis(double x)
 
 double
 BSpline::
-m(double x, int k, int i, vector<fp>& ks)
+m(double x, ii k, ii i, vector<fp>& ks)
 {
 	if (k == 1)
 	{
@@ -81,7 +81,7 @@ m(double x, int k, int i, vector<fp>& ks)
 
 double
 BSpline::
-m(double x, int k, int i)
+m(double x, ii k, ii i)
 {
 	if (k == 1)
 	{
@@ -104,10 +104,10 @@ m(double x, int k, int i)
 
 double
 BSpline::
-im(double x, int k)
+im(double x, ii k)
 {
 	double v = 0.0;
-	for (int i = 0; i < k + 1; ++i)
+	for (ii i = 0; i < k + 1; ++i)
 	{
 		v += m(x, k + 1, i);
 	}
@@ -115,9 +115,9 @@ im(double x, int k)
 }
 
 
-int
+ii
 BSpline::
-factorial(int n)
+factorial(ii n)
 {
 	return (n == 1 || n == 0) ? 1 : factorial(n - 1) * n;
 }

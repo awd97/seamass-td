@@ -20,27 +20,36 @@
 //
 
 
-#ifndef _SEAMASS_CORE_BSPLINE_HPP_
-#define _SEAMASS_CORE_BSPLINE_HPP_
+#ifndef _SEAMASS_CORE_BASISBSPLINEMZ_HPP_
+#define _SEAMASS_CORE_BASISBSPLINEMZ_HPP_
 
 
-#include "Matrix.hpp"
+#include "BasisBSpline.hpp"
+#include "DataMS.hpp"
 
 
-class BSpline
+class BasisBSplineMZ : public BasisBSpline
 {
 protected:
-	ii order, n;
-	std::vector<double> lookup;
+	// Input (gs) data indicies
+	const std::vector<ii>& is;
+
+	// Sparse basis matrices A (one per input spectrum)
+	std::vector<Matrix> as;
+	std::vector<Matrix> ats;
+
+	// min and max m/z across all spectra
+	double mz_min, mz_max;
 
 public:
-	BSpline(ii order, ii n);
-	double ibasis(double x);
+	BasisBSplineMZ(std::vector<Basis*>& bases, DataMS& input, std::vector< std::vector<double> >& mzs, ii out_res, ii order = 3, bool transient = false);
+	virtual ~BasisBSplineMZ() {}
 
-	static double m(double x, ii k, ii i, std::vector<fp>& ks);
-	static double m(double x, ii k, ii i);
-	static double im(double x, ii k);
-	static ii factorial(ii n);
+	void synthesis(Matrix& f, const Matrix& c, bool accum = true) const;
+	void analysis(Matrix& c_err, const Matrix& f_err, bool a_sqrd = true) const;
+
+	double get_min() const { return mz_min; }
+	double get_max() const { return mz_max; }
 };
 
 

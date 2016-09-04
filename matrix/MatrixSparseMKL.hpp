@@ -20,8 +20,8 @@
 //
 
 
-#ifndef _SEAMASS_CORE_SPARSEMATRIX_HPP_
-#define _SEAMASS_CORE_SPARSEMATRIX_HPP_
+#ifndef _SEAMASS_MATRIX_SPARSEMKL_HPP_
+#define _SEAMASS_MATRIX_SPARSEMKL_HPP_
 
 
 #include <mkl.h>
@@ -35,55 +35,41 @@ typedef MKL_INT ii; // ii is the selected indexing integer size (32 or 64 bit)
 typedef long long li; // 64bit integer
 
 
-class SparseMatrix
+class MatrixSparseMKL
 {
 private:
-	ii m;
-	ii n;
-
-	sparse_matrix_t a;
-	sparse_matrix_t sqr_a;
+	sparse_matrix_t mat;
 
 public:
-	SparseMatrix();
-	~SparseMatrix();
+	MatrixSparseMKL();
+	~MatrixSparseMKL();
 
-	void init(ii m, ii n, std::vector<fp>& acoo, std::vector<ii>& rowind, std::vector<ii>& colind);
+	void init(const std::vector<fp>& xs);
+	void init(ii n, fp v = 0.0);
+	void init(ii m, ii n, const std::vector<fp>& acoo, const std::vector<ii>& rowind, const std::vector<ii>& colind);
+	
+	bool operator!() const;
+	void copy(const MatrixSparseMKL& m);
+	void free();
 
-	void mult(fp* bs, const fp* xs, bool transpose = false, bool accum = false) const;
-	void sqr_mult(fp* bs, const fp* xs, bool transpose = false, bool accum = false) const;
+	ii m() const;
+	ii n() const;
 
-	ii get_m() const { return m; }
-	ii get_n() const { return n; }
+	void mult(const MatrixSparseMKL& a, const MatrixSparseMKL& x, bool accum, bool a_sqrd);
+	void elem_div(const MatrixSparseMKL& a, const MatrixSparseMKL& b);
+	void sqrt();
+	void shrink(const MatrixSparseMKL& c, const MatrixSparseMKL& l1, const MatrixSparseMKL& l2, fp shrinkage);
 
-	void print(std::ostream& out) const;
+	double sum_sqrd() const;
+	double sum_sqrd_diffs(const MatrixSparseMKL& a) const;
+
+	friend std::ostream& operator<<(std::ostream& os, const MatrixSparseMKL& mat);
+
+	li mem() const;
+	void save(const std::string filename) const;
 };
 
-
-class SparseMatrixOld
-{
-private:
-	ii m;
-	ii n;
-
-	fp* a;
-	ii* ia;
-	ii* ja;
-
-public:
-	SparseMatrixOld();
-	~SparseMatrixOld();
-
-	void init(ii m, ii n, std::vector<fp>& acoo, std::vector<ii>& rowind, std::vector<ii>& colind);
-
-	void mult(fp* bs, const fp* xs, bool transpose = false, bool accum = false) const;
-	void sqr_mult(fp* bs, const fp* xs, bool transpose = false, bool accum = false) const;
-
-	ii get_m() const { return m; }
-	ii get_n() const { return n; }
-
-	void print(std::ostream& out) const;
-};
+std::ostream& operator<<(std::ostream& os, const MatrixSparseMKL& mat);
 
 
 #endif

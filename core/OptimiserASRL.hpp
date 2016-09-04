@@ -29,35 +29,41 @@
 
 class OptimiserASRL
 {
-protected:
+public:
     const std::vector<Basis*>& bases;
-    std::vector<fp>& gs;
+    const Matrix& g;
  
-    std::vector< std::vector<fp> > cs;
-    std::vector< std::vector<fp> > wcs;
-    std::vector< std::vector<fp> > l2;
+	std::vector<Matrix> cs;
+	std::vector<Matrix> l1s;
+	std::vector<Matrix> l2s;
     
     ii accell;
-    std::vector< std::vector<fp> > c0s;
-    std::vector< std::vector<fp> > u0s;
-    std::vector< std::vector<fp> > q0s;
+	std::vector<Matrix> c0s;
+	std::vector<Matrix> u0s;
+	std::vector<Matrix> q0s;
     
     ii iteration;
-	Info info;
+	Basis::ErrorInfo info;
+
+	double synthesis_wtime;
+	double error_wtime;
+	double analysis_wtime;
+	double shrinkage_wtime;
+
+	Matrix f;
 
 public:    
-	OptimiserASRL(const std::vector<Basis*>& _bases,
-                  std::vector<fp>& gs,
-                  ii accell = 2);
+	OptimiserASRL(const std::vector<Basis*>& bases, const Matrix& g, ii accell = 2);
 	~OptimiserASRL();
     
     double step(ii iteration, double strength);
 
     void threshold(double threshold);
 
-    std::vector< std::vector<fp> >& get_cs() { return cs; }
-	const std::vector< std::vector<fp> >& get_l2() const { return l2; }
-	const Info& get_info() const { return info; }
+	std::vector<Matrix>& get_cs() { return cs; }
+	const std::vector<Matrix>& get_l1s() const { return l1s; }
+	const std::vector<Matrix>& get_l2s() const { return l2s; }
+	const Basis::ErrorInfo& get_info() const { return info; }
 };
 
 

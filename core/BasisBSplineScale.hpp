@@ -20,27 +20,27 @@
 //
 
 
-#ifndef _SEAMASS_CORE_BSPLINE_HPP_
-#define _SEAMASS_CORE_BSPLINE_HPP_
+#ifndef _SEAMASS_CORE_BASISBSPLINESCALE_HPP_
+#define _SEAMASS_CORE_BASISBSPLINESCALE_HPP_
 
 
-#include "Matrix.hpp"
+#include "BasisBSpline.hpp"
 
 
-class BSpline
-{
-protected:
-	ii order, n;
-	std::vector<double> lookup;
+class BasisBSplineScale : public BasisBSpline
+{ 
+private:
+	Matrix a;
+	Matrix at;
+
+	ii dim;
 
 public:
-	BSpline(ii order, ii n);
-	double ibasis(double x);
+	BasisBSplineScale(std::vector<Basis*>& bases, ii parent_index, ii dim, ii order = 3, bool transient = false);
+	virtual ~BasisBSplineScale() {}
 
-	static double m(double x, ii k, ii i, std::vector<fp>& ks);
-	static double m(double x, ii k, ii i);
-	static double im(double x, ii k);
-	static ii factorial(ii n);
+	void synthesis(Matrix& f, const Matrix& c, bool accum = true) const;
+	void analysis(Matrix& c_err, const Matrix& f_err, bool a_sqrd = false) const;
 };
 
 

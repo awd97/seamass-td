@@ -35,74 +35,155 @@ SparseMatrix() :
 SparseMatrix::
 ~SparseMatrix()
 {
-	mkl_sparse_destroy(a);
+	free();
 }
 
 
 void
 SparseMatrix::
-init(ii _m, ii _n, std::vector<fp>& acoo, std::vector<ii>& rowind, std::vector<ii>& colind)
+init(const std::vector<fp>& xs)
 {
-	m = _m;
-	n = _n;
+	free();
 
-	if (a)
+	ii nnz = 0;
+	for (ii j = 0; j < (ii)xs.size(); j++)
 	{
-		mkl_sparse_destroy(a);
+		if (xs[j] != 0.0) nnz++;
+	}
+
+	std::vector<fp> acoo(nnz);
+	std::vector<ii> rowind(nnz, 0);
+	std::vector<ii> colind(nnz);
+
+	ii nz = 0;
+	for (ii j = 0; j < (ii)xs.size(); j++)
+	{
+		if (xs[j] != 0.0)
+		{
+			acoo[nz] = xs[j];
+			colind[nz] = j;
+			nz++;
+		}
 	}
 
 	sparse_matrix_t t;
-	sparse_status_t status = mkl_sparse_s_create_coo(&t, SPARSE_INDEX_BASE_ZERO, m, n, acoo.size(), rowind.data(), colind.data(), acoo.data());
+	mkl_sparse_s_create_coo(&t, SPARSE_INDEX_BASE_ZERO, 1, (ii)xs.size(), (ii)acoo.size(), (ii*)rowind.data(), (ii*)colind.data(), (fp*)acoo.data());
 	mkl_sparse_convert_csr(t, SPARSE_OPERATION_NON_TRANSPOSE, &a);
-	status = mkl_sparse_optimize(a);
 	mkl_sparse_destroy(t);
+}
 
-	fp* sqr_acoo = new fp[acoo.size()];
-	vsSqr(acoo.size(), acoo.data(), sqr_acoo);
-	mkl_sparse_s_create_coo(&t, SPARSE_INDEX_BASE_ZERO, m, n, acoo.size(), rowind.data(), colind.data(), sqr_acoo);
-	mkl_sparse_convert_csr(t, SPARSE_OPERATION_NON_TRANSPOSE, &sqr_a);
-	mkl_sparse_optimize(sqr_a);
+
+void
+SparseMatrix::
+init(ii n, fp v)
+{
+	free();
+
+	std::vector<fp> xs(n, v);
+	std::vector<ii> rowind(n, 0);
+	std::vector<ii> colind(n); for (ii i = 0; i < n; i++) colind[i] = i;
+
+	sparse_matrix_t t;
+	mkl_sparse_s_create_coo(&t, SPARSE_INDEX_BASE_ZERO, 1, n, (ii)xs.size(), (ii*)rowind.data(), (ii*)colind.data(), (fp*)xs.data());
+	mkl_sparse_convert_csr(t, SPARSE_OPERATION_NON_TRANSPOSE, &a);
 	mkl_sparse_destroy(t);
-	delete sqr_acoo;
-}
-
-
-
-void
-SparseMatrix::
-mult(fp* bs, const fp* xs, bool transpose, bool accum) const
-{
-	matrix_descr info;
-	info.type = SPARSE_MATRIX_TYPE_GENERAL;
-	mkl_sparse_s_mv(transpose ? SPARSE_OPERATION_TRANSPOSE : SPARSE_OPERATION_NON_TRANSPOSE, 1.0, a, info, xs, accum ? 1.0 : 0.0, bs);
 }
 
 
 void
 SparseMatrix::
-sqr_mult(fp* bs, const fp* xs, bool transpose, bool accum) const
+init(ii m, ii n, const std::vector<fp>& acoo, const std::vector<ii>& rowind, const std::vector<ii>& colind)
 {
-	matrix_descr info;
-	info.type = SPARSE_MATRIX_TYPE_GENERAL;
-	mkl_sparse_s_mv(transpose ? SPARSE_OPERATION_TRANSPOSE : SPARSE_OPERATION_NON_TRANSPOSE, 1.0, sqr_a, info, xs, accum ? 1.0 : 0.0, bs);
+	free();
+
+	sparse_matrix_t t;
+	mkl_sparse_s_create_coo(&t, SPARSE_INDEX_BASE_ZERO, m, n, (ii)acoo.size(), (ii*)rowind.data(), (ii*)colind.data(), (fp*)acoo.data());
+	mkl_sparse_convert_csr(t, SPARSE_OPERATION_NON_TRANSPOSE, &a);
+	mkl_sparse_destroy(t);
 }
 
 
 void
 SparseMatrix::
-print(ostream& out) const
+operator=(const SparseMatrix& m)
 {
-	li size = sizeof(this);
-	size += sizeof(fp) * 0;
-	size += sizeof(ii) * (m + 1);
-	size += sizeof(ii) * 0;
+	free();
+	matrix_descr descr;
+	descr.type = SPARSE_MATRIX_TYPE_GENERAL;
+	mkl_sparse_copy(m.a, descr, &a);
+}
 
-	cout << "[" << m << "," << n << "]:" << 0 << " mem=" << setprecision(2) << fixed << size / (1024.0*1024.0) << "Mb";
+
+bool
+SparseMatrix::
+operator!() const
+{
+	return a == 0;
+}
+
+
+void
+SparseMatrix::
+free()
+{
+	if (a)
+	{
+		mkl_sparse_destroy(a);
+		a = 0;
+	}
+}
+
+
+void
+SparseMatrix::
+mult(SparseMatrix& b, const SparseMatrix& x, bool accum, bool a_sqrd) const
+{
+	if (!!b && accum)
+	{
+		SparseMatrix t;
+		mkl_sparse_spmm(SPARSE_OPERATION_NON_TRANSPOSE, x.a, a, &t.a);
+		mkl_sparse_s_add(SPARSE_OPERATION_NON_TRANSPOSE, b.a, 1.0f, t.a, &b.a);
+	}
+	else
+	{
+		mkl_sparse_spmm(SPARSE_OPERATION_NON_TRANSPOSE, x.a, a, &b.a);
+	}
+}
+
+
+/*fp* sqr_acoo = new fp[acoo.size()];
+vsSqr(acoo.size(), acoo.data(), sqr_acoo);
+mkl_sparse_s_create_coo(&t, SPARSE_INDEX_BASE_ZERO, m, n, acoo.size(), (ii*)rowind.data(), (ii*)colind.data(), sqr_acoo);
+mkl_sparse_convert_csr(t, SPARSE_OPERATION_NON_TRANSPOSE, &sqr_a);
+mkl_sparse_destroy(t);
+delete sqr_acoo;*/
+
+
+ostream&
+operator<<(ostream& os, const SparseMatrix& mat)
+{
+	if (mat.a)
+	{
+		ii m, n;
+		ii* i0s, *i1s, *js;
+		fp* vs;
+		sparse_index_base_t indexing;
+		mkl_sparse_s_export_csr(mat.a, &indexing, &m, &n, &i0s, &i1s, &js, &vs);
+		ii nnz = i1s[m - 1] - i0s[0];
+		os << "[" << m << "," << n << "]:" << nnz << " mem=" << (2 * nnz + m + 1) / 1024.0 / 1024.0 << "Mb";
+	}
+	else
+	{
+		os << "[]";
+	}
+
+	return  os;
 }
 
 
 
-
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+/*
 SparseMatrixOld::
 SparseMatrixOld() :
 a(0)
@@ -152,7 +233,7 @@ SparseMatrixOld::
 mult(fp* bs, const fp* xs, bool transpose, bool accum) const
 {
 	fp alpha = 1.0;
-	fp beta = accum ? 1.0 : 0.0;
+	fp beta = (fp) accum ? 1.0f : 0.0f;
 	if (transpose)
 	{
 		mkl_scsrmv("T", &m, &n, &alpha, "G**C", a, ja, ia, &(ia[1]), const_cast<fp*>(xs), &beta, bs);
@@ -172,7 +253,7 @@ sqr_mult(fp* bs, const fp* xs, bool transpose, bool accum) const
 	vsSqr(ia[m], a, sqr_a);
 
 	fp alpha = 1.0;
-	fp beta = accum ? 1.0 : 0.0;
+	fp beta = (fp) accum ? 1.0f : 0.0f;
 	if (transpose)
 	{
 		mkl_scsrmv("T", &m, &n, &alpha, "G**C", sqr_a, ja, ia, &(ia[1]), const_cast<fp*>(xs), &beta, bs);
@@ -197,3 +278,4 @@ print(ostream& out) const
 
 	cout << "[" << m << "," << n << "]:" << ia[m] << " mem=" << setprecision(2) << fixed << size / (1024.0*1024.0) << "Mb";
 }
+*/

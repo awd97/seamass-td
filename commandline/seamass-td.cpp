@@ -110,7 +110,7 @@ int main(int argc, char *argv[])
 	int threads = atoi(argv[9]);
 	int out_type = atoi(argv[10]);
 
-	int lastdot = in_file.find_last_of("."); 
+	int lastdot = (int) in_file.find_last_of("."); 
 	string id = (lastdot == string::npos) ? in_file : in_file.substr(0, lastdot); 
 
 	// open H5 file
@@ -121,7 +121,7 @@ int main(int argc, char *argv[])
 
     H5::DataSet start_time_ds = file.openDataSet("StartTime");
     start_time_ds.getSpace().getSimpleExtentDims(&ns);
-    cout << "Querying metadata from " << ns << " spectra..." << endl;
+    cout << "Querying metadata from " << ns << " spectra..." << endl << endl;
     vector<double> start_times(ns);
     start_time_ds.read(start_times.data(), H5::DataType(H5::PredType::NATIVE_DOUBLE));
 
@@ -137,7 +137,7 @@ int main(int argc, char *argv[])
     for (size_t i = 0; i < ns; i++)
     {
         spectra[i].index = i;
-        spectra[i].preset_config = config_indices[i];
+        spectra[i].preset_config = (unsigned short) config_indices[i];
         spectra[i].precursor_mz = precursor_mzs[i];
         spectra[i].scan_start_time = start_times[i];
     }
@@ -177,8 +177,8 @@ int main(int argc, char *argv[])
             precursor_mz_is_constant = false;
         
 		// load spectra into mzs and intensities vectors if precursor_mz
-        hsize_t offset = indices[spectra[i].index];
-        hsize_t count = indices[spectra[i].index+1] - offset;
+        hsize_t offset = (hsize_t) indices[spectra[i].index];
+        hsize_t count = (hsize_t) indices[spectra[i].index+1] - offset;
         
         H5::DataSpace memspace(1, &count);
 

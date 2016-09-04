@@ -29,36 +29,11 @@
 using namespace std;
 
 
-Basis::
-Basis(vector<Basis*>& bases, bool _transient, ii _parent_index) :
-	parent_index(_parent_index),
-	transient(_transient)
-{
-	index = (ii) bases.size();
-	bases.push_back(this);
-	if (parent_index >= 0) bases[parent_index]->child_count++;
-}
-
-
 Basis::ErrorInfo
 Basis::
-error(Matrix& f_err, const Matrix& f, const Matrix& g) const
+error(SparseMatrix& fs, const SparseMatrix& gs) const
 {
-	//cout << "  error Basis G" << g << " %/% F" << f << " =";
-	f_err.elem_div(f, g);
-	//cout << " F_err" << f_err << endl;
-
-	/*if (fs[i] > 0.0 && gs[i] >= 0.0)
-	{
-		fs[i] = gs[i] / fs[i];
-	}
-	else
-	{
-		fs[i] = 1.0;
-	}*/
-
-
-	/*ErrorInfo info;
+	ErrorInfo info;
 
 	/* ii size_d = 0;
 	double dis = 0.0;
@@ -95,18 +70,14 @@ error(Matrix& f_err, const Matrix& f, const Matrix& g) const
 	info.discrep = dis / size_d;
 	info.error = err / size_d;*/
 
-	return ErrorInfo();
+	return info;
 }
 
 
 void
 Basis::
-shrink(Matrix& c_err, const Matrix& c, const Matrix& l1, const Matrix& l2, fp shrinkage) const
+shrink(SparseMatrix& es, const SparseMatrix& cs, const SparseMatrix& l2, const SparseMatrix& wcs, double shrinkage) const
 {
-	//cout << "  shrinkage Basis C_err" << c_err << " %*% C" << c << " %/% (" << shrinkage << " x L2" << l2 << " + L1" << l1 << " =";
-	c_err.shrink(c, l1, l2, shrinkage);
-	//cout << " C" << c_err << endl;
-
 	// Standard shrinkage
 	/*#pragma omp parallel for
 	for (li i = 0; i < es.size(); i++)
@@ -119,3 +90,73 @@ shrink(Matrix& c_err, const Matrix& c, const Matrix& l1, const Matrix& l2, fp sh
 	es[i] = 0.0;
 	}*/
 }
+
+
+////////////////////////////////////////////////////////////////////////////////
+
+
+BasisBSpline::MeshInfo::
+MeshInfo(ii _dc) :
+	d(_dc),
+	ls(_dc),
+	os(_dc),
+	ns(_dc),
+	m(0)
+{
+}
+
+
+void
+BasisBSpline::MeshInfo::
+operator=(const BasisBSpline::MeshInfo& ci)
+{
+	d = ci.d;
+	ls = ci.ls;
+	os = ci.os;
+	ns = ci.ns;
+	m = ci.m;
+}
+
+
+BasisBSpline::MeshInfo::
+~MeshInfo()
+{
+}
+
+
+li
+BasisBSpline::MeshInfo::
+size() const
+{
+	li size = m;
+	for (ii i = 0; i < d; i++) size *= ns[i];
+	return size;
+}
+
+
+void
+BasisBSpline::MeshInfo::
+print(ostream& out) const
+{
+	out << "l=[";
+	for (ii i = 0; i < d; i++)
+	{
+		if (ls[i] == numeric_limits<ii>::min()) out << "?"; else out << ls[i];
+		if (i < d - 1) out << ",";
+	}
+	out << "] oc=[";
+	for (ii i = 0; i < d; i++)
+	{
+		if (os[i] == numeric_limits<ii>::min()) out << "?"; else out << os[i];
+		if (i < d - 1) out << ",";
+	}
+	out << "] nc=" << m << "x[";
+	for (ii i = 0; i < d; i++)
+	{
+		if (ns[i] == numeric_limits<ii>::min()) out << "?"; else out << ns[i];
+		if (i < d - 1) out << ",";
+	}
+	out << "]=" << size();
+}
+
+

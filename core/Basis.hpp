@@ -24,43 +24,41 @@
 #define _SEAMASS_CORE_BASIS_HPP_
 
 
-#include "core.hpp"
-#include <iostream>
-
-
-struct Info
-{
-	double volume;
-	double discrep;
-	double error;
-	double max_error;
-};
+#include "Matrix.hpp"
 
 
 class Basis
 {
+public:
+	struct ErrorInfo
+	{
+		double volume;
+		double discrep;
+		double error;
+		double max_error;
+	};
+
 private:
-    ii index;       // index of this basis in the serialised tree
-    Basis* parent;  // parent node
-    ii child_count; // how many children synthesise to this node
-    bool transient; // if transient, coefficients not part of fitting
+	ii index;       // index of this basis in the serialised tree
+	ii parent_index;  // parent node
+	ii child_count; // how many children synthesise to this node
+	bool transient; // if transient, coefficients not part of fitting
 
 public:
-	Basis(std::vector<Basis*>& bases,
-          Basis* parent = NULL, bool
-          transient = false);
-    virtual ~Basis() {}
-    
-    virtual void synthesis(std::vector<fp>& fs, const std::vector<fp>& cs, bool accum = true) const = 0;
-	virtual void analysis(std::vector<fp>& es, const std::vector<fp>& fs) const = 0;
-	virtual void l2norm(std::vector<fp>& es, const std::vector<fp>& fs) const = 0;
-	virtual Info error(std::vector<fp>& fs, const std::vector<fp>& gs) const;
-	virtual void shrink(std::vector<fp>& es, const std::vector<fp>& cs, const std::vector<fp>& l2, const std::vector<fp>& wcs, double shrinkage) const;
+	Basis(std::vector<Basis*>& bases, bool transient = false, ii parent_index = -1);
+	virtual ~Basis() {}
+
+	virtual void synthesis(Matrix& f, const Matrix& c, bool accum = true) const = 0;
+	virtual void analysis(Matrix& c_err, const Matrix& f_err, bool a_sqrd = false) const = 0;
+
+	virtual ErrorInfo error(Matrix& f_err, const Matrix& f, const Matrix& g) const;
+	virtual void shrink(Matrix& c_err, const Matrix& c, const Matrix& l1, const Matrix& l2, fp shrinkage) const;
+
 	virtual li get_nc() const = 0;
 
-    ii get_index() const { return index; }
-    Basis* get_parent() const { return parent; }
-    bool is_transient() const { return transient; }
+	ii get_index() { return index; }
+	ii get_parent_index() { return parent_index; }
+	bool is_transient() { return transient; }
 };
 
 

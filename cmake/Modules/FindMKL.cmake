@@ -5,16 +5,17 @@
 #  MKL_LIB_DIR, the directory for the MKL library files
 #  MKL_COMPILER_LIB_DIR, the directory for the MKL compiler library files
 #  MKL_LIBRARIES, the libraries needed to use Intel's implementation of BLAS & LAPACK.
+#  MKL_COMPILER_DEFINITIONS, the compiler definitions needed.
 #  MKL_FOUND, If false, do not try to use MKL; if true, the macro definition USE_MKL is added.
 
 # Set the include path
 # TODO: what if MKL is not installed in /opt/intel/mkl?
 # try to find at /opt/intel/mkl
-# in windows, try to find MKL at C:/Program Files (x86)/Intel/Composer XE/mkl
+# in windows, try to find MKL at C:/Program Files (x86)/IntelSWTools/compilers_and_libraries/windows\mkl
 
 if ( WIN32 )
   if(NOT DEFINED ENV{MKLROOT_PATH})
-    set(MKLROOT_PATH "C:/Program Files (x86)/Intel/Composer XE" CACHE PATH "Where the MKL are stored")
+    set(MKLROOT_PATH "C:/Program Files (x86)/IntelSWTools/compilers_and_libraries/windows" CACHE PATH "Where the MKL are stored")
   endif(NOT DEFINED ENV{MKLROOT_PATH}) 
 else ( WIN32 )
     set(MKLROOT_PATH "/opt/intel" CACHE PATH "Where the MKL are stored")
@@ -25,13 +26,6 @@ if (EXISTS ${MKLROOT_PATH}/mkl)
     message("MKL is found at ${MKLROOT_PATH}/mkl")
     IF(CMAKE_SIZEOF_VOID_P EQUAL 8)
         set( USE_MKL_64BIT On )
-        if ( ARMADILLO_FOUND )
-            if ( ARMADILLO_BLAS_LONG_LONG )
-                set( USE_MKL_64BIT_LIB On )
-                ADD_DEFINITIONS(-DMKL_ILP64)
-                message("MKL is linked against ILP64 interface ... ")
-            endif ( ARMADILLO_BLAS_LONG_LONG )
-        endif ( ARMADILLO_FOUND )
     ELSE(CMAKE_SIZEOF_VOID_P EQUAL 8)
         set( USE_MKL_64BIT Off )
     ENDIF(CMAKE_SIZEOF_VOID_P EQUAL 8)
@@ -50,6 +44,7 @@ if (MKL_FOUND)
         if ( USE_MKL_64BIT_LIB )
                 if (WIN32)
                     set(MKL_LIBRARIES ${MKL_LIBRARIES} ${MKL_LIB_DIR}/mkl_intel_ilp64.lib)
+                    set(MKL_COMPILER_DEFINITIONS ${MKL_COMPILER_DEFINITIONS} "-DMKL_ILP64")
                 else (WIN32)
                     set(MKL_LIBRARIES ${MKL_LIBRARIES} ${MKL_LIB_DIR}/libmkl_intel_ilp64.so)
                 endif (WIN32)

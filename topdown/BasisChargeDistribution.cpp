@@ -30,7 +30,7 @@
 using namespace std;
 
 
-double
+/*double
 BasisChargeDistribution::
 proton_mass = 1.007276466879; // in Daltons
 
@@ -56,7 +56,7 @@ BasisChargeDistribution(vector<Basis*>& bases,
 	cos(max_z+1),
 	mass_interval(_mass_interval / pow(2.0, (double)out_res))
 {
-	cout << get_index() << " BasisChargeDistribution " << flush;
+	std::cout << get_index() << " BasisChargeDistribution " << flush;
 
 	///////////////////////////////////////////////////////////////////////
 	// create A as a temporary COO matrix
@@ -66,7 +66,7 @@ BasisChargeDistribution(vector<Basis*>& bases,
 	// find min (mz0) and max (mz1) m/z across all spectra
 	double mz0 = numeric_limits<double>::max();
 	double mz1 = 0.0;
-	for (ii j = 0; j < js.size(); j++)
+	for (ii j = 0; j < (ii) js.size(); j++)
 	{
 		ms[j] = (ii)(is[j + 1] - is[j]);
 		mz0 = mzs[js[j]].front() < mz0 ? mzs[js[j]].front() : mz0;
@@ -78,14 +78,14 @@ BasisChargeDistribution(vector<Basis*>& bases,
 	// calculate output mass and hence coefficient range
 	double mass0 = mz0 - proton_mass;
 	double mass1 = max_z * (mz1 - proton_mass);
-	ii mi0 = ceil(mass0 / mass_interval);
-	ii mi1 = floor(mass1 / mass_interval);
+	ii mi0 = (ii) ceil(mass0 / mass_interval);
+	ii mi1 = (ii) floor(mass1 / mass_interval);
 	mass0 = mi0 * mass_interval;
 	mass1 = mi1 * mass_interval;
 
 	// figure out nnz, ci0s and ci1s
 	#pragma omp parallel for
-	for (ii j = 0; j < js.size(); ++j)
+	for (ii j = 0; j < (ii) js.size(); ++j)
 	{
 		for (ii z = 0; z < max_z; z++)
 		for (ii i = 0; i < ms[j]; i++)
@@ -115,7 +115,7 @@ BasisChargeDistribution(vector<Basis*>& bases,
 	ii done = 0;
 	BSpline bspline(3, 65535); // bspline basis function lookup table
 	#pragma omp parallel for
-	for (ii j = 0; j < js.size(); ++j)
+	for (ii j = 0; j < (ii) js.size(); ++j)
 	{
 		vector<fp> acoo(nnzs[j]);
 		vector<ii> rowind(nnzs[j]);
@@ -148,8 +148,7 @@ BasisChargeDistribution(vector<Basis*>& bases,
 						double b1 = mzs[js[j]][i + 1] < basis1 ? (mzs[js[j]][i + 1] - basis0) / (basis1 - basis0) : 1.0;
 
 						// basis coefficient b is _integral_ of area under b-spline basis
-						double b = bspline.ibasis(b1) - bspline.ibasis(b0);
-						if (b <= FLT_MIN) b = FLT_MIN;
+						fp b = (fp) (bspline.ibasis(b1) - bspline.ibasis(b0));
 
 						acoo[k] = b;
 						rowind[k] = i;
@@ -180,7 +179,7 @@ BasisChargeDistribution(vector<Basis*>& bases,
 	cout << get_index() << " BasisChargeDistribution";
 	cout << " mass_range=[" << setprecision(2) << mass0 << ":" << setprecision(4) << mass_interval << ":" << setprecision(2) << mass1 << "]Da";
 	if (transient) cout << " (t)" << endl; else cout << " nc=" << nc << endl;
-	for (ii j = 0; j < js.size(); j++)
+	for (ii j = 0; j < (ii) js.size(); j++)
 	{
 		cout << "  A[" << j << "]=";
 		as[j].print(cout);
@@ -201,9 +200,9 @@ BasisChargeDistribution::~BasisChargeDistribution()
 
 void
 BasisChargeDistribution::
-synthesis(vector<fp>& fs, const vector<fp>& cs, bool accum) const
+synthesis(SparseMatrix& fs, const SparseMatrix& cs, bool accum) const
 {
-	for (li j = 0; j < as.size(); j++)
+	for (li j = 0; j < (li) as.size(); j++)
 	{
 		as[j].mult(&(fs.data()[is[j]]), &(cs.data()[j*as[j].get_n()]), false, accum);
 	}
@@ -212,7 +211,7 @@ synthesis(vector<fp>& fs, const vector<fp>& cs, bool accum) const
 
 void
 BasisChargeDistribution::
-analysis(vector<fp>& es, const vector<fp>& fs) const
+analysis(SparseMatrix& es, const SparseMatrix& fs) const
 {
 	for (li j = 0; j < as.size(); j++)
 	{
@@ -223,75 +222,177 @@ analysis(vector<fp>& es, const vector<fp>& fs) const
 
 void
 BasisChargeDistribution::
-l2norm(vector<fp>& es, const vector<fp>& fs) const
+l2norm(SparseMatrix& es, const SparseMatrix& fs) const
 {
 	for (li j = 0; j < as.size(); j++)
 	{
 		as[j].sqr_mult(&(es.data()[j*as[j].get_n()]), &(fs.data()[is[j]]), true);
 	}
+}*/
+
+
+
+BasisBSplineMZ::
+BasisBSplineMZ(vector<Basis*>& bases,
+                const vector< vector<double> >& mzs,
+                const vector<fp>& gs, const vector<li>& _is, const vector<ii>& js,
+                ii out_res, ii order,
+                bool transient) :
+	BasisBSpline(bases, 1, NULL, transient),
+	is(_is),
+	as(js.size())
+{
+	double mz_interval = 1.0033548378 / (60 * pow(2.0, (double) out_res));
+
+	///////////////////////////////////////////////////////////////////////
+	// create A as a temporary COO matrix
+
+	// calculate indicies of non-empty spectra
+	mi.m = as.size();
+
+	vector<ii> ms(mi.m);
+	vector<ii> nnzs(mi.m, 0);
+
+	// find min and max m/z across spectra
+	mz_min = DBL_MAX;
+	mz_max = 0.0;
+	for (ii j = 0; j < mi.m; j++)
+	{
+		ms[j] = (ii)(is[j + 1] - is[j]);
+		mz_min = mzs[js[j]].front() < mz_min ? mzs[js[j]].front() : mz_min;
+		mz_max = mzs[js[j]].back() > mz_max ? mzs[js[j]].back() : mz_max;
+	}
+	mi.ls[0] = out_res;
+	mi.os[0] = (ii)floor(mz_min / mz_interval);
+	mi.ns[0] = ((ii)ceil(mz_max / mz_interval)) + order - mi.os[0];
+
+	// figure out nnz
+	#pragma omp parallel for
+	for (ii j = 0; j < mi.m; ++j)
+	{
+		for (ii i = 0; i < ms[j]; i++)
+		{
+			if (gs[is[j] + i] >= 0.0)
+			{
+				double cf0 = mzs[js[j]][i] / mz_interval;
+				double cf1 = mzs[js[j]][i + 1] / mz_interval;
+
+				ii ci0 = (ii)floor(cf0);
+				ii ci1 = ((ii)ceil(cf1)) + order;
+
+				nnzs[j] += ci1 - ci0;
+			}
+		}
+	}
+
+	li nnz = 0, m = 0;
+	for (ii j = 0; j < mi.m; j++) nnz += nnzs[j];
+	for (ii j = 0; j < mi.m; j++) m += ms[j];
+	cout << get_index() << " BasisBSplineMZ As=" << mi.m << "x[" << m << "," << mi.ns[0] << "]:" << nnz << " ";
+	cout << mi;
+	li size = is.back();
+	for (ii j = 0; j < (ii)as.size(); j++) size += 2 * nnzs[j] + 1;
+	cout << " mem=" << setprecision(2) << fixed << (sizeof(this) + size*sizeof(fp)) / (1024.0*1024.0) << "Mb";
+	if (transient) cout << " (t)";
+	cout << endl;
+
+	// populate coo matrix
+	ii done = 0;
+	BSpline bspline(order, 65536); // bspline basis function lookup table
+	#pragma omp parallel for
+	for (ii j = 0; j < ci.m; ++j)
+	{
+		vector<fp> acoo(nnzs[j]);
+		vector<ii> rowind(nnzs[j]);
+		vector<ii> colind(nnzs[j]);
+
+
+		ii k = 0;
+		for (ii i = 0; i < ms[j]; i++)
+		{
+			if (gs[is[j] + i] >= 0.0)
+			{
+				double cf0 = mzs[js[j]][i] / mz_interval;
+				double cf1 = mzs[js[j]][i + 1] / mz_interval;
+
+				ii c0 = (ii) floor(cf0);
+				ii c1 = ((ii) ceil(cf1)) + order;
+
+				// work out basis coefficients
+				for (ii c = c0; c < c1; c++)
+				{
+					double bf0 = (double) (c - order);
+					double bf1 = (double) c + 1;
+
+					// intersection of bin and basis, between 0 and order+1
+					double b0 = cf0 > bf0 ? cf0 - bf0 : 0.0;
+					double b1 = cf1 < bf1 ? cf1 - bf0 : bf1 - bf0;
+
+					// basis coefficient b is _integral_ of area under b-spline basis
+					fp b = (fp) (bspline.ibasis(b1) - bspline.ibasis(b0));
+
+					acoo[k] = b;
+					rowind[k] = i;
+					colind[k] = c - mi.os[0];
+					k++;
+				}
+			}
+
+		}
+
+		cout << endl << "ARGH2" << endl;
+
+		// create A and free coo
+		as[j].init(ms[j], ci.ns[0], acoo, rowind, colind);
+
+		// display progress update
+		#pragma omp critical
+		{
+			done++;
+			if (done % 100 == 0)
+			{
+				for (int i = 0; i < 256; ++i) cout << '\b';
+				cout << get_index() << " BasisBSplineMZ " << setw(1 + (int)(log10((float)ci.m))) << done << "/" << ci.m << " " << flush;
+			}
+		}
+	}
+	for (int i = 0; i < 256; ++i) cout << '\b';
+}
+
+
+BasisBSplineMZ::~BasisBSplineMZ()
+{
 }
 
 
 void
-BasisChargeDistribution::
-shrink(std::vector<fp>& es, const std::vector<fp>& cs, const std::vector<fp>& l2, const std::vector<fp>& wcs, double shrinkage) const
+BasisBSplineMZ::
+synthesis(SparseMatrix& fs, const SparseMatrix& cs, bool accum) const
 {
-	// GROUP-WISE SHRINKAGE! (note - intuitive implemention, not mathematically verified yet)
-	// also horrible gather operation
-	vector<fp> gcs(ci1s.back() - ci0s.front() + 1, 0.0);
-
-	// sum up coefficients per group
-	for (ii z = 0; z < cos.size() - 1; z++)
-	for (ii i = cos[z]; i < cos[z + 1]; i++)
-	for (ii j = 0; j < as.size(); j++)
-	if (es[j*cos.back() + i] > 0.0)
+	/*for (li j = 0; j < (li) as.size(); j++)
 	{
-		gcs[i - cos[z] + ci0s[z] - ci0s.front()] += cs[j*cos.back() + i];
-	}
-
-	// scale the shrinkage to be proportional to the contribution of this coefficient to the group total
-	//#pragma omp parallel for
-	for (ii z = 0; z < cos.size() - 1; z++)
-	for (ii i = cos[z]; i < cos[z + 1]; i++)
-	for (ii j = 0; j < as.size(); j++)
-	if (es[j*cos.back() + i] > 0.0)
-	{
-		if (cs[j*cos.back() + i] > 0.0)
-		{
-			double scale = cs[j*cos.back() + i] / gcs[i - cos[z] + ci0s[z] - ci0s.front()];
-			es[j*cos.back() + i] *= cs[j*cos.back() + i] / (scale * shrinkage * l2[j*cos.back() + i] + wcs[j*cos.back() + i]);
-		}
-		else
-		{
-			es[j*cos.back() + i] = 0.0;
-		}
-	}
+	as[j].mult(&(fs.data()[is[j]]), &(cs.data()[j*as[j].get_n()]), false, accum);
+	}*/
 }
 
 
 void
-BasisChargeDistribution::
-write_cs(const std::vector<fp>& cs) const
+BasisBSplineMZ::
+analysis(SparseMatrix& es, const SparseMatrix& fs) const
 {
-	ostringstream oss; oss << "profile" << get_index() << ".csv";
-	ofstream ofs(oss.str().c_str());
-
-	// sum up coefficients per group
-	vector<fp> gcs(ci1s.back() - ci0s.front() + 1, 0.0);
-	for (ii z = 0; z < cos.size() - 1; z++)
-	for (ii i = cos[z]; i < cos[z + 1]; i++)
-	for (li j = 0; j < as.size(); j++)
+	/*for (li j = 0; j < as.size(); j++)
 	{
-		gcs[i - cos[z] + ci0s[z] - ci0s.front()] += cs[j*cos.back() + i];
-	}
-
-	ofs << "mass,intensity" << setprecision(10) << endl;
-	for (ii i = 0; i < gcs.size(); ++i)
-	{
-		if (gcs[i] > 0.0 || i > 0 && gcs[i - 1] > 0.0 || i < gcs.size() - 1 && gcs[i + 1] > 0.0)
-		{
-			ofs << (ci0s.front() + i) * mass_interval << "," << gcs[i] << endl;
-		}
-	}
+	as[j].mult(&(es.data()[j*as[j].get_n()]), &(fs.data()[is[j]]), true);
+	}*/
 }
 
+
+void
+BasisBSplineMZ::
+l2norm(SparseMatrix& es, const SparseMatrix& fs) const
+{
+	/*for (li j = 0; j < as.size(); j++)
+	{
+	as[j].sqr_mult(&(es.data()[j*as[j].get_n()]), &(fs.data()[is[j]]), true);
+	}*/
+}

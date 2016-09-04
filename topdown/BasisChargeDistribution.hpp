@@ -24,14 +24,13 @@
 #define _SEAMASS_TOPDOWN_BASISCHARGEDISTRIBUTION_HPP_
 
 
-#include "../core/Basis.hpp"
-#include "../core/BSpline.hpp"
+#include "../core/BasisBSpline.hpp"
 
 
-class BasisChargeDistribution : public Basis
+/*class BasisChargeDistribution : public Basis
 {
 protected:
-	// Input (gs) data
+	// Input (gs) data indicies
 	const std::vector<li>& is;
 
 	// Sparse basis matrices A (one per input spectrum)
@@ -55,19 +54,48 @@ public:
 
 	~BasisChargeDistribution();
 
-	void synthesis(std::vector<fp>& fs, const std::vector<fp>& cs, bool accum = true) const;
-	void analysis(std::vector<fp>& es, const std::vector<fp>& fs) const;
-	void l2norm(std::vector<fp>& es, const std::vector<fp>& fs) const;
-	void shrink(std::vector<fp>& es, const std::vector<fp>& cs, const std::vector<fp>& l2, const std::vector<fp>& wcs, double shrinkage) const;
+	void synthesis(SparseMatrix& fs, const SparseMatrix& cs, bool accum = true) const;
+	void analysis(SparseMatrix& es, const SparseMatrix& fs) const;
+	void l2norm(SparseMatrix& es, const SparseMatrix& fs) const;
+	void shrink(SparseMatrix& es, const SparseMatrix& cs, const SparseMatrix& l2, const SparseMatrix& wcs, double shrinkage) const;
 	li get_nc() const { return nc; }
 
 	const std::vector<ii>& get_ci0s() const { return ci0s; }
 	const std::vector<ii>& get_ci1s() const { return ci1s; }
 	const std::vector<ii>& get_cos() const { return cos; }
-	ii get_ns() const { return as.size(); }
+	ii get_ns() const { return (ii) as.size(); }
 	double get_mass_interval() const { return mass_interval; }
 
 	void write_cs(const std::vector<fp>& cs) const;
+};*/
+
+
+class BasisBSplineMZ : public BasisBSpline
+{
+protected:
+	// Input (gs) data indicies
+	const std::vector<li>& is;
+
+	// Sparse basis matrices A (one per input spectrum)
+	std::vector<SparseMatrix> as;
+
+	// min and max m/z across all spectra
+	double mz_min, mz_max;
+
+public:
+	BasisBSplineMZ(std::vector<Basis*>& bases, const std::vector< std::vector<double> >& mzs,
+		const std::vector<fp>& gs, const std::vector<li>& is, const std::vector<ii>& js,
+		ii out_res, ii order = 3,
+		bool transient = false);
+
+	~BasisBSplineMZ();
+
+	void synthesis(SparseMatrix& fs, const SparseMatrix& cs, bool accum = true) const;
+	void analysis(SparseMatrix& es, const SparseMatrix& fs) const;
+	void l2norm(SparseMatrix& es, const SparseMatrix& fs) const;
+
+	double get_min() const { return mz_min; }
+	double get_max() const { return mz_max; }
 };
 
 

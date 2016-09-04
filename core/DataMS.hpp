@@ -20,27 +20,29 @@
 //
 
 
-#ifndef _SEAMASS_CORE_BSPLINE_HPP_
-#define _SEAMASS_CORE_BSPLINE_HPP_
+#ifndef _SEAMASS_CORE_DATAMS_HPP_
+#define _SEAMASS_CORE_DATAMS_HPP_
 
 
 #include "Matrix.hpp"
 
 
-class BSpline
+class DataMS
 {
-protected:
-	ii order, n;
-	std::vector<double> lookup;
+private:
+	std::vector<fp> exposures; // per-spectrum exposures
+	Matrix g;          // raw data as a 1D vector
+	std::vector<ii> is; // spectrum indicies into gs, size is number of spectra + 1 
+	std::vector<ii> js; // spectrum indicies into mzs & intensitives, size is number of spectra
 
 public:
-	BSpline(ii order, ii n);
-	double ibasis(double x);
+	DataMS(const std::string& id, const std::string& config_id, int instrument_type,
+		std::vector<double>& sts, std::vector< std::vector<double> >& mzs, std::vector< std::vector<double> >& intensities);
+	~DataMS() {}
 
-	static double m(double x, ii k, ii i, std::vector<fp>& ks);
-	static double m(double x, ii k, ii i);
-	static double im(double x, ii k);
-	static ii factorial(ii n);
+	const Matrix& get_g() const { return g; }
+	const std::vector<ii>& get_is() const { return is; }
+	const std::vector<ii>& get_js() const { return js; }
 };
 
 

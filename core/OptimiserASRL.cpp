@@ -30,120 +30,119 @@ using namespace std;
 
 
 OptimiserASRL::
-OptimiserASRL(const vector<Basis*>& _bases,
-              vector<fp>& _gs,
-              ii _accell) :
+OptimiserASRL(const std::vector<Basis*>& _bases, const Matrix& _g, ii _accell) :
+	g(_g),
     bases(_bases),
-    gs(_gs),
     accell(_accell),
-    iteration(0)
+    iteration(0),
+	cs(bases.size()),
+	l1s(bases.size()),
+	l2s(bases.size()),
+	c0s(accell >= 1 ? bases.size() : 0),
+	u0s(accell >= 1 ? bases.size() : 0),
+	q0s(accell >= 2 ? bases.size() : 0),
+	synthesis_wtime(0),
+	error_wtime(0),
+	analysis_wtime(0),
+	shrinkage_wtime(0)
 {
-    // pre-compute weights
-    wcs.resize(bases.size());
-    for (ii j = 0; j < (ii) bases.size(); j++)
-    {
-        //cout << j << endl;
-        wcs[j].resize(bases[j]->get_nc());
-        if (j == 0)
-        {
-            vector<fp> ts(gs.size(), 1.0);
-            bases[j]->analysis(wcs[0], ts);
-        }
-        else
-        {
-            bases[j]->analysis(wcs[j], wcs[bases[j]->get_parent()->get_index()]);
-        }
-    }
-    for (ii j = 0; j < (ii) bases.size(); j++)
-    {
-        if (bases[j]->is_transient()) vector<fp>().swap(wcs[j]);
-    }
-    
-    // pre-compute l2norm
-    l2.resize(bases.size());
-    for (ii j = 0; j < (ii) bases.size(); j++)
-    {
-        l2[j].resize(bases[j]->get_nc());
-        if (j == 0)
-        {
-            vector<fp> ts(gs.size(), 1.0);
-            bases[j]->l2norm(l2[0], ts);
-        }
-        else
-        {
-            bases[j]->l2norm(l2[j], l2[bases[j]->get_parent()->get_index()]);
-        }
-    }
-    for (ii j = 0; j < (ii) bases.size(); j++)
-    {
-        if (bases[j]->is_transient())
-        {
-            vector<fp>().swap(l2[j]);
-        }
-        else
-        {   // sqrt
-            // not 64 bit compliant atm // vsSqrt(bases[j]->get_nc(), &(l2[j][0]), &(l2[j][0]));
-            for (li i = 0; i < (li) bases[j]->get_nc(); i++) l2[j][i] = sqrt(l2[j][i]);
-        }
-    }
-    
-    // starting cs from ng
-    cs.resize(bases.size());
-    for (ii j = 0; j < (ii) bases.size(); j++)
-    {
-        cs[j].resize(bases[j]->get_nc());
-        if (j == 0)
-        {
-            bases[j]->analysis(cs[0], gs);
-        }
-        else
-        {
-            bases[j]->analysis(cs[j], cs[bases[j]->get_parent()->get_index()]);
-        }
-    }
-    for (ii j = 0; j < (ii) bases.size(); j++)
-    {
-        if (bases[j]->is_transient()) vector<fp>().swap(cs[j]);
-    }
-    // any bases that are too small must be deleted to avoid numerical problems
-    for (ii j = 0; j < (ii) bases.size(); j++)
-    {
-        if (!bases[j]->is_transient())
-        for (li i = 0; i < (li) bases[j]->get_nc(); i++)
-        if (wcs[j][i] < 0.001) cs[j][i] = 0.0;
-    }
-    
-    // temporaries required for acceleration
-    if (accell >= 1)
-    {
-        c0s.resize(bases.size());
-        u0s.resize(bases.size());
-        for (ii j = 0; j < (ii) bases.size(); j++)
-        if (!bases[j]->is_transient())
-        {
-            c0s[j].resize(bases[j]->get_nc());
-            u0s[j].resize(bases[j]->get_nc());
-        }
-    }
-    if (accell >= 2)
-    {
-        q0s.resize(bases.size());
-        for (ii j = 0; j < (ii) bases.size(); j++)
-        if (!bases[j]->is_transient())
-        {
-            q0s[j].resize(bases[j]->get_nc());
-        }
-    }
-    
-    // how much memory are we using?
-    li size = 0;
-    for (ii j = 0; j < cs.size(); j++) if (!bases[j]->is_transient()) size += bases[j]->get_nc();
-    for (ii j = 0; j < wcs.size(); j++) if (!bases[j]->is_transient()) size += bases[j]->get_nc();
-    for (ii j = 0; j < l2.size(); j++) if (!bases[j]->is_transient()) size += bases[j]->get_nc();
-    for (ii j = 0; j < c0s.size(); j++) if (!bases[j]->is_transient()) size += bases[j]->get_nc();
-    for (ii j = 0; j < u0s.size(); j++) if (!bases[j]->is_transient()) size += bases[j]->get_nc();
-    for (ii j = 0; j < q0s.size(); j++) if (!bases[j]->is_transient()) size += bases[j]->get_nc();
-    cout << endl << "Vector Extrapolated Sparse Richardson-Lucy mem=" << fixed << setprecision(2) << (size*sizeof(fp) + sizeof(this))/(1024.0*1024.0) << "Mb" << endl;
+	cout << "Accelerated Sparse Richardson-Lucy accell=" << accell << endl;
+
+	// compute basis function L1 norms 
+	l1s.resize(bases.size());
+	for (ii i = 0; i < (ii)bases.size(); i++)
+	{
+		if (i == 0)
+		{
+			Matrix t; t.init(g.n(), 1.0);
+			bases[i]->analysis(l1s.front(), t);
+		}
+		else
+		{
+			bases[i]->analysis(l1s[i], l1s[bases[i]->get_parent_index()]);
+		}
+	}
+	for (ii i = 0; i < (ii)bases.size(); i++)
+	{
+		cout << l1s[i] << endl;
+		if (bases[i]->is_transient()) l1s[i].free();
+	}
+
+	// compute basis function L2 norms
+	l2s.resize(bases.size());
+	for (ii i = 0; i < (ii)bases.size(); i++)
+	{
+		if (i == 0)
+		{
+			Matrix t; t.init(g.n(), 1.0);
+			bases[i]->analysis(l2s.front(), t, true);
+		}
+		else
+		{
+			bases[i]->analysis(l2s[i], l2s[bases[i]->get_parent_index()], true);
+		}
+	}
+	for (ii i = 0; i < (ii)bases.size(); i++)
+	{
+		if (bases[i]->is_transient())
+		{
+			l2s[i].free();
+		}
+		else
+		{
+			l2s[i].sqrt();
+		}
+	}
+
+	vector<Matrix> ts(bases.size() + 1);
+	for (ii i = (ii)bases.size() - 1; i >= 0; i--)
+	{
+		ii parent_i = bases[i]->get_parent_index();
+
+		// if parent Matrix not initialised and not transient then we need to copy in its cs before synthesis
+		if (!ts[parent_i + 1] && parent_i >= 0 && !bases[parent_i]->is_transient())
+		{
+			ts[parent_i + 1].init(cs[parent_i].n(), 1.0);
+		}
+
+		// perform the synthesis
+		if (!ts[i + 1])
+		{
+			ts[i + 1].init(cs[i].n, 1.0);
+		}
+		bases[i]->synthesis(ts[parent_i + 1], ts[i + 1]);
+		ts[i + 1].free();
+	}
+	ts[0].save("t.csv");
+	exit(0);
+
+	// initialising C from G
+	for (ii i = 0; i < (ii)bases.size(); i++)
+	{
+		if (i == 0)
+		{
+			bases[i]->analysis(cs[0], g);
+		}
+		else
+		{
+			bases[i]->analysis(cs[i], cs[bases[i]->get_parent_index()]);
+		}
+	}
+	for (ii i = 0; i < (ii)bases.size(); i++)
+	{
+		if (bases[i]->is_transient())
+		{
+			cs[i].free();
+		}
+		else
+		{
+			cs[i].elem_div(cs[i], l1s[i]);
+		}
+	}
+
+
+
+	cout << "Initialised C from G" << endl;
 }
 
 
@@ -157,13 +156,13 @@ void
 OptimiserASRL::
 threshold(double thresh)
 {
-    for (ii j = 0; j < (ii) bases.size(); j++)
+    /*for (ii j = 0; j < (ii) bases.size(); j++)
     if (!bases[j]->is_transient())
     #pragma omp parallel for
     for (li i = 0; i < (li) bases[j]->get_nc(); i++)
     {
         if (cs[j][i] < thresh) cs[j][i] = 0.0;
-    }
+    }*/
     
     //for (ii j = 0; j < (ii) bases.size(); j++)
     //if (!bases[j]->is_transient())
@@ -179,92 +178,109 @@ double
 OptimiserASRL::
 step(ii iteration, double shrinkage)
 {
-    double synthesis_start = omp_get_wtime();
-    // synthesis except root
-    vector< vector<fp> > ts(bases.size());
-    for (ii j = (ii) bases.size() - 1; j > 0; j--)
-    {
-        ii pj = bases[j]->get_parent()->get_index();
-        if (ts[pj].size() == 0)
-        if (bases[pj]->is_transient())
-        {
-            ts[pj].resize(bases[pj]->get_nc(), 0.0);
-        }
-        else
-        {
-            ts[pj].resize(bases[pj]->get_nc());
-            for (li i = 0; i < (li) bases[pj]->get_nc(); i++) ts[pj][i] = cs[pj][i];
-        }
+	//////////////////////////////////////////////////////////////////////////////////////
+	// SYNTHESIS
 
-        if (ts[j].size() == 0)
-        {
-            bases[j]->synthesis(ts[pj], cs[j]);
-        }
-        else
-        {
-            bases[j]->synthesis(ts[pj], ts[j]);
-            
-        }
-        vector<fp>().swap(ts[j]);
-    }
-    //synthesis root
-	vector<fp> fs(gs.size());
-    if (ts.front().size() == 0)
-    {
-        bases.front()->synthesis(fs, cs.front());
-    }
-    else
-    {
-        bases.front()->synthesis(fs, ts.front());
-    }
-    vector<fp>().swap(ts.front());
-    // timing
-    double synthesis_duration = omp_get_wtime() - synthesis_start;
-    static double culm_synthesis_duration = 0.0;
-    culm_synthesis_duration += synthesis_duration;
-    
-    double error_start = omp_get_wtime();
-    // Poisson likelihood error
-    info = bases.front()->error(fs, gs);
-    // timing
-    double error_duration = omp_get_wtime() - error_start;
-    static double culm_error_duration = 0.0;
-    culm_error_duration += error_duration;
+	double synthesis_stime = omp_get_wtime();
 
-    double analysis_start = omp_get_wtime();
-    // analysis root
-    vector< vector<fp> > es(bases.size());
-    es.front().resize(bases.front()->get_nc());
-    bases.front()->analysis(es.front(), fs);
-    vector<fp>().swap(fs);
-    // analysis except root
-    for (ii j = 1; j < (ii) bases.size(); j++)
-    {
-        es[j].resize(bases[j]->get_nc());
-        bases[j]->analysis(es[j], es[bases[j]->get_parent()->get_index()]);
-        // use child count here to delete transient es sooner
-    }
-    // timing
-    double analysis_duration = omp_get_wtime() - analysis_start;
-    static double culm_analysis_duration = 0.0;
-    culm_analysis_duration += analysis_duration;
+	vector<Matrix> ts(bases.size() + 1);
+	for (ii i = (ii)bases.size() - 1; i >= 0; i--)
+	{
+		ii parent_i = bases[i]->get_parent_index();
 
-    double shrinkage_start = omp_get_wtime();
+		// if parent Matrix not initialised and not transient then we need to copy in its cs before synthesis
+		if (!ts[parent_i + 1] && parent_i >= 0 && !bases[parent_i]->is_transient())
+		{
+			ts[parent_i + 1].copy(cs[parent_i]);
+		}
+
+		// perform the synthesis
+		if (!ts[i + 1])
+		{
+			bases[i]->synthesis(ts[parent_i + 1], cs[i]);
+		}
+		else
+		{
+			bases[i]->synthesis(ts[parent_i + 1], ts[i + 1]);
+		}
+		ts[i + 1].free();
+	}
+
+	synthesis_wtime += omp_get_wtime() - synthesis_stime;
+
+	f.copy(ts[0]);
+
+	//////////////////////////////////////////////////////////////////////////////////////
+	// POISSON LIKELIHOOD ERROR
+
+	double error_stime = omp_get_wtime();
+
+    info = bases.front()->error(ts[0], ts[0], g);
+
+	error_wtime += omp_get_wtime() - error_stime;
+
+	//////////////////////////////////////////////////////////////////////////////////////
+	// ANALYSIS
+
+    double analysis_stime = omp_get_wtime();
+
+	// initialising cs from gs
+	for (ii i = 0; i < (ii)bases.size(); i++)
+	{
+		bases[i]->analysis(ts[i + 1], ts[bases[i]->get_parent_index() + 1]);
+	}
+	ts.front().free();
+	for (ii i = 0; i < (ii)bases.size(); i++)
+	{
+		if (bases[i]->is_transient())
+		{
+			ts[i + 1].free();
+		}
+	}
+
+	analysis_wtime += omp_get_wtime() - analysis_stime;
+	
+	//////////////////////////////////////////////////////////////////////////////////////
+	// SHRINKAGE
+
+    double shrinkage_stime = omp_get_wtime();
+
     // shrinkage
-    for (ii j = 0; j < (ii) bases.size(); j++)
+    for (ii i = 0; i < (ii) bases.size(); i++)
     {
-        if (bases[j]->is_transient())
+        if (!bases[i]->is_transient())
         {
-            vector<fp>().swap(es[j]);
-        }
-        else
-        {
-			bases[j]->shrink(es[j], cs[j], l2[j], wcs[j], shrinkage);
+			bases[i]->shrink(ts[i + 1], cs[i], l1s[i], l2s[i], shrinkage);
         }
     }
-    double shrinkage_duration = omp_get_wtime() - shrinkage_start;
-    static double culm_shrinkage_duration = 0.0;
-    culm_shrinkage_duration += shrinkage_duration;
+
+	shrinkage_wtime += omp_get_wtime() - shrinkage_stime;
+
+	double sum = 0.0;
+	double sumd = 0.0;
+	for (ii i = 0; i < (ii)bases.size(); i++)
+	{
+		sum += ts[i + 1].sum_sqrd();
+		sumd += cs[i].sum_sqrd_diffs(ts[i + 1]);
+
+		cs[i].copy(ts[i + 1]);
+	}
+
+	return sqrt(sumd) / sqrt(sum);
+
+/*		if (!bases[j]->is_transient())
+#pragma omp parallel for reduction(+:sum,sumd)
+			for (li i = 0; i < (li)bases[j]->get_nc(); i++)
+			{
+		sum += cs[j][i] * cs[j][i];
+		sumd += (es[j][i] - cs[j][i])*(es[j][i] - cs[j][i]);
+
+		cs[j][i] = es[j][i];
+			}*/
+
+	/*
+	//////////////////////////////////////////////////////////////////////////////////////
+	// ACCELERATION
 
     double accel_start = omp_get_wtime();
     // unaccelerated update
@@ -422,5 +438,5 @@ step(ii iteration, double shrinkage)
     //cout << "Iteration   Durations: synthesis=" << setprecision(2) << synthesis_duration << " error=" << error_duration << " analysis=" << analysis_duration << " shrinkage=" << shrinkage_duration << " accel=" << accel_duration << " all=" << synthesis_duration+error_duration+analysis_duration+shrinkage_duration+accel_duration << endl;
     //cout << "Culminative Durations: synthesis=" << culm_synthesis_duration << " error=" << culm_error_duration << " analysis=" << culm_analysis_duration << " shrinkage=" << culm_shrinkage_duration << " accel=" << culm_accel_duration<< " all=" << culm_synthesis_duration+culm_error_duration+culm_analysis_duration+culm_shrinkage_duration +culm_accel_duration << endl;
     
-    return sqrt(sumd)/sqrt(sum);
+    return sqrt(sumd)/sqrt(sum);*/
 }

@@ -55,14 +55,14 @@ namespace utils
 		if (instrument_type == 1) // ToF
 		{
 			#pragma omp parallel for
-			for (ii j = 0; j < mzs.size(); j++)
+			for (ii j = 0; j < (ii) mzs.size(); j++)
 			if (mzs[j].size() >= 2)
 			{
 				// dividing by minimum to get back to ion counts for SWATH data which appears to be scaled to correct for dynamic range restrictions (hack!)
 				double minimum = std::numeric_limits<double>::max();
 
 				// we drop the first and last m/z datapoint as we don't know both their bin edges
-				for (ii i = 1; i < mzs[j].size(); i++)
+				for (ii i = 1; i < (ii) mzs[j].size(); i++)
 				{
 					if (intensities[j][i] > 0) minimum = minimum < intensities[j][i] ? minimum : intensities[j][i];
 
@@ -72,8 +72,8 @@ namespace utils
 				}
 				mzs[j].resize(mzs[j].size() - 1);
 				intensities[j].resize(intensities[j].size() - 2);
-				exposures[j] = 1.0 / minimum;
-				for (ii i = 0; i < intensities[j].size(); i++)
+				exposures[j] = (fp) (1.0 / minimum);
+				for (ii i = 0; i < (ii) intensities[j].size(); i++)
 				{
 					intensities[j][i] *= exposures[j];
 				}
@@ -111,10 +111,10 @@ namespace utils
 		else // FT-ICR (Orbitrap is a type of FT-ICR)
 		{
 			#pragma omp parallel for
-			for (ii j = 0; j < mzs.size(); j++)
+			for (ii j = 0; j < (ii) mzs.size(); j++)
 			if (mzs[j].size() >= 2)
 			{
-				for (ii i = 1; i < mzs[j].size(); i++)
+				for (ii i = 1; i < (ii) mzs[j].size(); i++)
 				{
 					intensities[j][i - 1] = (mzs[j][i] - mzs[j][i - 1]) * 0.5 * (intensities[j][i] + intensities[j][i - 1]);
 				}
@@ -134,13 +134,13 @@ namespace utils
 	          const vector< vector<double> >& intensities)
 	{
 		ii nj = 0;
-		for (ii j = 0; j < intensities.size(); j++)
+		for (ii j = 0; j < (ii) intensities.size(); j++)
 		if (intensities[j].size() > 0) nj++;
 
 		js.resize(nj);
 		is.resize(nj + 1);
 		is.front() = 0;
-		for (ii i = 0, j = 0; j < intensities.size(); j++)
+		for (ii i = 0, j = 0; j < (ii) intensities.size(); j++)
 		if (intensities[j].size() > 0)
 		{
 			js[i] = j;
@@ -151,9 +151,9 @@ namespace utils
 		gs.resize(is.back());
 		#pragma omp parallel for
 		for (ii j = 0; j < nj; j++)
-		for (ii i = 0; i < intensities[js[j]].size(); i++)
+		for (ii i = 0; i < (ii) intensities[js[j]].size(); i++)
 		{
-			gs[is[j] + i] = intensities[js[j]][i];
+			gs[is[j] + i] = (fp) intensities[js[j]][i];
 		}
 
 		cout << "Raw gs=[" << js.size() << "/" << intensities.size() << "]:" << gs.size() << " mem=" << fixed << setprecision(2) << (is.size()*sizeof(li) + js.size()*sizeof(ii) + gs.size()*sizeof(fp)) / (1024.0*1024.0) << "Mb";

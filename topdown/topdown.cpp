@@ -21,8 +21,9 @@
 
 
 #include "topdown.hpp"
-#include "BasisChargeDistribution.hpp"
-#include "BasisIsotopeDistribution.hpp"
+#include "../core/DataMS.hpp"
+#include "../core/BasisBSplineMZ.hpp"
+#include "../core/BasisBSplineScale.hpp"
 #include "../core/OptimiserASRL.hpp"
 #include <fstream>
 #include <sstream>
@@ -51,71 +52,63 @@ namespace seamass
 
 	void
 	topdown(const std::string& id, const std::string& config_id, int instrument_type,
-		    vector<double>& rts, vector< vector<double> >& mzs, vector< vector<double> >& intensities,
+		    vector<double>& sts, vector< vector<double> >& mzs, vector< vector<double> >& intensities,
 		    double out_mass0, double out_mass1, int out_res, int max_z, double max_peak_width, int shrink, int tol,
 		    int threads, int debug)
 	{
-        cout << "SIZE: " << sizeof(ii) << endl;
+        cout << "seaMass matrix_capacity=" << 8 * sizeof(ii) << "bit" << endl;
         
 		double start = omp_get_wtime();
 		int _threads = omp_get_num_threads();
 		omp_set_num_threads(threads);
 
-		cout << "Input id=" << id << " config_id=" << config_id << " instrument_type=" << instrument_type << endl;
-		cout << endl;
-
 		////////////////////////////////////////////////////////////////////////////////////
-		// INIT RAW DATA AND MZ BASIS
+		// INIT RAW DATA AND BASIS FUNCTIONS
 
-		// Ensure the raw data is in binned format and compute exposures
-		vector<fp> exposures;
-		utils::bin_mzs_intensities(mzs, intensities, instrument_type, exposures);
+		DataMS input(id, config_id, instrument_type, sts, mzs, intensities);
+		for (ii j = 0; j < (ii)intensities.size(); j++) std::vector<double>().swap(intensities[j]); // free intensities
 
-		// Convert intensities into format used in algorithm for gs
-		vector<fp> gs; vector<li> is; vector<ii> js;
-		utils::create_gs(gs, is, js, intensities);
-		for (ii j = 0; j < (ii)intensities.size(); j++) vector<double>().swap(intensities[j]);
-
-		// Create our tree of bases
 		vector<Basis*> bases;
-		ii order = 3; // B-spline order
+		BasisBSplineMZ bRoot(bases, input, mzs, out_res);
+		for (ii j = 0; j < (ii)mzs.size(); j++) std::vector<double>().swap(mzs[j]); // free mzs
 
-		// Construct BasisChargeDistribution, which gets added as the root node of bases
-		BasisChargeDistribution bChargeDistribution(bases, mzs, gs, is, js, 1.00286084990559, out_res, 0, max_z, max_peak_width);
-		for (ii j = 0; j < (ii)mzs.size(); j++) vector<double>().swap(mzs[j]);
-
-		// Construct BasisIsotopeDistribution, which gets added to bases with bChargeDistribution as parent
-		//BasisIsotopeDistribution bIsotopeDistribution(bases, &bChargeDistribution, out_res, 0, max_z);
+		BasisBSplineScale bScale1(bases, bRoot.get_index(), 0);
+		BasisBSplineScale bScale2(bases, bScale1.get_index(), 0);
+		BasisBSplineScale bScale3(bases, bScale2.get_index(), 0);
 
 		////////////////////////////////////////////////////////////////////////////////////
 		// OPTIMISATION
 		double thres = 1.0; // L0 threshold
 
-		OptimiserASRL optimiser(bases, gs, 2);
+		OptimiserASRL optimiser(bases, input.get_g(), 2);
 
 		double shrinkage = pow(2.0, (double)shrink);
 		double tolerance = pow(2.0, (double)tol);
 		double grad = DBL_MAX;
 
 		// l1
-		li nc = 0;
-		for (ii j = 0; j < (ii)bases.size(); j++)
-		if (!bases[j]->is_transient())
-			nc += bases[j]->get_nc();
-		cout << " L1 nc=" << nc << " shrinkage=" << shrink << ":" << fixed << setprecision(2) << shrinkage << " tolerance=" << tol << ":" << setprecision(6) << tolerance << endl;
+		//li nc = 0;
+		//for (ii j = 0; j < (ii)bases.size(); j++)
+		//if (!bases[j]->is_transient())
+		//	nc += bases[j]->get_nc();
+		//cout << " L1 nc=" << nc << " shrinkage=" << shrink << ":" << fixed << setprecision(2) << shrinkage << " tolerance=" << tol << ":" << setprecision(6) << tolerance << endl;
 
 		//bIsotopeDistribution.restrict_range(optimiser.get_cs()[bIsotopeDistribution.get_index()], out_mass0, out_mass1);
 
 		for (ii i = 0; grad > tolerance; i++)
 		{
 			grad = optimiser.step(i, shrinkage);
-            if (isnan(grad)) grad = 1.0;
+            
+			cout << "  f: " << fixed << setw(5) << i;
+			cout << "  grad: " << setiosflags(ios::fixed) << setprecision(6) << setw(8) << grad << endl;
+
+			/*if (isnan(grad)) grad = 1.0;
 
 			li nnz = 0;
 			for (ii j = 0; j < (ii)bases.size(); j++)
 			if (!bases[j]->is_transient())
 			for (ii i = 0; i < (ii)bases[j]->get_nc(); i++)
-			if (optimiser.get_cs()[j][i] > thres)
+			//if (optimiser.get_cs()[j][i] > thres)
 			{
 				nnz++;
 			}
@@ -126,11 +119,14 @@ namespace seamass
 			cout << "  dis: " << setw(8) << setprecision(5) << optimiser.get_info().discrep;
 			cout << "  vol: " << setw(8) << setprecision(5) << optimiser.get_info().volume;
 			cout << "  nnz: " << setw(8) << setprecision(5) << nnz;
-			cout << "  grad: " << setiosflags(ios::fixed) << setprecision(6) << setw(8) << grad << endl;
+			cout << "  grad: " << setiosflags(ios::fixed) << setprecision(6) << setw(8) << grad << endl;*/
 		}
 
+		input.get_g().save("g.csv");
+		optimiser.f.save("f.csv");
+
 		// l0
-		cout << " L0 threshold=" << fixed << setprecision(2) << thres << " tolerance=" << tol << ":" << setprecision(6) << tolerance << endl;
+		/*cout << " L0 threshold=" << fixed << setprecision(2) << thres << " tolerance=" << tol << ":" << setprecision(6) << tolerance << endl;
 
 		optimiser.threshold(thres);
 		grad = DBL_MAX;
@@ -143,7 +139,7 @@ namespace seamass
 			for (ii j = 0; j < (ii)bases.size(); j++)
 			if (!bases[j]->is_transient())
 			for (ii i = 0; i < (ii)bases[j]->get_nc(); i++)
-			if (optimiser.get_cs()[j][i] > thres)
+			//if (optimiser.get_cs()[j][i] > thres)
 			{
 				nnz++;
 			}
@@ -155,7 +151,7 @@ namespace seamass
 			cout << "  vol: " << setw(8) << setprecision(5) << optimiser.get_info().volume;
 			cout << "  nnz: " << setw(8) << setprecision(5) << nnz;
 			cout << "  grad: " << setiosflags(ios::fixed) << setprecision(6) << setw(8) << grad << endl;
-		}
+		}*/
         //cout << "a" << endl;
 		//////////////////////////////////////////////////////////////////////////////////
 		// OUTPUT
@@ -164,7 +160,7 @@ namespace seamass
 		//vector<fp> ts(bChargeDistribution.get_nc());
 		//bIsotopeDistribution.synthesis(ts, optimiser.get_cs()[bIsotopeDistribution.get_index()]);
 		//cout << "c" << endl;
-		bChargeDistribution.write_cs(optimiser.get_cs()[bChargeDistribution.get_index()]);
+		//bChargeDistribution.write_cs(optimiser.get_cs()[bChargeDistribution.get_index()]);
         //cout << "d" << endl;
 		//vector<fp> fs(gs.size());
 		//bChargeDistribution.synthesis(fs, ts);
@@ -175,7 +171,7 @@ namespace seamass
         //cout << "e" << endl;
 		////////////////////////////////////////////////////////////////////////////////////
 		omp_set_num_threads(_threads);
-		cout << "Duration: " << (omp_get_wtime() - start) / 60.0 << "mins" << endl;
+		cout << "Duration: " << (omp_get_wtime() - start) << "seconds" << endl;
 	}
 
 
